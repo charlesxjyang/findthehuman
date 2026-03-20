@@ -55,16 +55,21 @@ async function botLoop(bot: BotState): Promise<void> {
       if (!bot.currentRoom) {
         // Check for available rooms
         const rooms = await api('/agents/rooms/available', apiKey);
-        if (rooms.length > 0) {
+        if (Array.isArray(rooms) && rooms.length > 0) {
           const room = rooms[0];
+          console.log(`${tag} Found room ${room.room_id} (${room.slots_remaining} slots)`);
           const joinResult = await api(`/agents/rooms/${room.room_id}/join`, apiKey, {
             method: 'POST',
           });
           if (joinResult.joined) {
             bot.currentRoom = room.room_id;
             bot.messagesSent = 0;
-            console.log(`${tag} Joined room ${room.room_id}`);
+            console.log(`${tag} Joined room ${room.room_id} (${joinResult.participants} players)`);
+          } else {
+            console.log(`${tag} Failed to join: ${joinResult.error || 'unknown'}`);
           }
+        } else if (rooms.error) {
+          console.log(`${tag} Poll error: ${rooms.error}`);
         }
         await sleep(5000);
         continue;
