@@ -76,6 +76,19 @@ export default function PlayPage() {
     }
   }, []);
 
+  // Warn before leaving during active game
+  useEffect(() => {
+    const inGame = ['topic_reveal', 'discussion', 'voting'].includes(phase);
+    if (!inGame) return;
+
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [phase]);
+
   // Timer countdown
   useEffect(() => {
     if (!timerEnd) return;

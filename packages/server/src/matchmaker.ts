@@ -1,6 +1,6 @@
 import { Queue, Worker, type ConnectionOptions } from 'bullmq';
 import Redis from 'ioredis';
-import { createRoom, joinRoom, assignHandles, advancePhase, getRoom, getVotes } from './rooms.js';
+import { createRoom, joinRoom, assignHandles, advancePhase, getRoom, getVotes, cleanupRoom } from './rooms.js';
 import { computeScores, updateElo } from './scoring.js';
 import { db } from './db/connection.js';
 import { users, games, gameParticipants } from './db/schema.js';
@@ -66,8 +66,8 @@ export async function checkAndStartRoom(roomId: string, io?: any): Promise<void>
 
   const participantCount = room.participants.length;
 
-  // Start when we have the human + 5 bots (or at least human + 2 bots)
-  if (participantCount >= ROOM_SIZE || participantCount >= 3) {
+  // Start when we have 6 participants (human + 5 bots)
+  if (participantCount >= ROOM_SIZE) {
     await startGame(roomId, io);
   }
 }
@@ -119,16 +119,16 @@ export function startPhaseWorker(io: Server): void {
       const room = await getRoom(roomId);
       if (!room) return;
 
-      // If still in lobby, try to start the game
+      // If still in lobby, check if we have enough players
       if (room.phase === 'lobby') {
-        if (room.participants.length < 2) {
-          // Not enough players — notify and clean up
+        if (room.participants.length >= ROOM_SIZE) {
+          await startGame(roomId, io);
+        } else {
           io.of('/game').to(`room:${roomId}`).emit('room:error', {
-            message: 'Not enough bots available right now. Please try again later.',
+            message: 'Not enough bots joined in time. Please try again.',
           });
-          return;
+          await cleanupRoom(roomId);
         }
-        await startGame(roomId, io);
         return;
       }
 
