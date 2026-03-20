@@ -73,6 +73,12 @@ export async function checkAndStartRoom(roomId: string, io?: any): Promise<void>
 }
 
 async function startGame(roomId: string, io?: any): Promise<void> {
+  // Atomic lock to prevent double-start from concurrent bot joins
+  const { getRedis } = await import('./redis.js');
+  const redis = getRedis();
+  const locked = await redis.set(`room:${roomId}:starting`, '1', 'EX', 10, 'NX');
+  if (!locked) return; // Another call is already starting this room
+
   const room = await getRoom(roomId);
   if (!room || room.phase !== 'lobby') return;
 
