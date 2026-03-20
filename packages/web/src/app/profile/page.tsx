@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getUserProfile } from '@/lib/api';
 
@@ -26,13 +26,19 @@ interface UserProfile {
   recent_games: GameEntry[];
 }
 
-export default function ProfilePage() {
-  const { id } = useParams<{ id: string }>();
+function ProfileContent() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get('id');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!id) {
+      setError('No user ID provided');
+      setLoading(false);
+      return;
+    }
     getUserProfile(id)
       .then(setProfile)
       .catch((err) => setError(err.message))
@@ -55,7 +61,6 @@ export default function ProfilePage() {
     );
   }
 
-  // Build Elo history from games
   const eloHistory = profile.recent_games
     .filter((g) => g.elo_after !== null)
     .reverse()
@@ -71,7 +76,6 @@ export default function ProfilePage() {
         Back to leaderboard
       </Link>
 
-      {/* Profile header */}
       <div className="bg-card rounded-xl p-6 mb-6">
         <div className="flex items-center justify-between">
           <div>
@@ -96,7 +100,6 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* Elo chart (simple SVG) */}
       {eloHistory.length > 1 && (
         <div className="bg-card rounded-xl p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Elo History</h2>
@@ -125,7 +128,6 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Recent games */}
       <div className="bg-card rounded-xl p-6">
         <h2 className="text-lg font-semibold mb-4">Recent Games</h2>
         {profile.recent_games.length === 0 ? (
@@ -166,5 +168,17 @@ export default function ProfilePage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-400">Loading profile...</p>
+      </main>
+    }>
+      <ProfileContent />
+    </Suspense>
   );
 }

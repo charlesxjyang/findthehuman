@@ -86,7 +86,7 @@ export default function LeaderboardPage() {
                   <td className="px-4 py-3 text-gray-400">#{e.rank}</td>
                   <td className="px-4 py-3">
                     <Link
-                      href={`/profile/${e.id}`}
+                      href={`/profile?id=${e.id}`}
                       className="hover:text-primary transition-colors"
                     >
                       {e.display_name}

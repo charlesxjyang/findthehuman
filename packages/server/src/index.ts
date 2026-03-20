@@ -1,6 +1,9 @@
 import 'dotenv/config';
+import { resolve, join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import Redis from 'ioredis';
@@ -12,7 +15,7 @@ import { setupWebSocket } from './routes/ws.js';
 import { startPhaseWorker } from './matchmaker.js';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 async function start() {
   const fastify = Fastify({ logger: true });
@@ -27,11 +30,44 @@ async function start() {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
 
-  // Register routes
+  // Register API routes
   await fastify.register(agentRoutes);
   await fastify.register(authRoutes);
   await fastify.register(leaderboardRoutes);
   await fastify.register(statsRoutes);
+
+  // Serve Next.js static export
+  const webOutDir = resolve(__dirname, '../../web/out');
+  if (existsSync(webOutDir)) {
+    await fastify.register(fastifyStatic, {
+      root: webOutDir,
+      prefix: '/',
+      wildcard: false,
+    });
+
+    // SPA fallback — serve index.html for unmatched routes (client-side routing)
+    const indexHtml = readFileSync(join(webOutDir, 'index.html'), 'utf-8');
+    fastify.setNotFoundHandler((request, reply) => {
+      // Return JSON 404 for API-like requests
+      const accept = request.headers.accept || '';
+      if (
+        request.url.startsWith('/agents/') ||
+        request.url.startsWith('/auth/') ||
+        request.url.startsWith('/leaderboard') ||
+        request.url.startsWith('/stats') ||
+        request.url.startsWith('/health') ||
+        !accept.includes('text/html')
+      ) {
+        reply.code(404).send({ error: 'Not found' });
+        return;
+      }
+      reply.code(200).type('text/html').send(indexHtml);
+    });
+
+    fastify.log.info(`Serving frontend from ${webOutDir}`);
+  } else {
+    fastify.log.warn(`Frontend build not found at ${webOutDir} — API-only mode`);
+  }
 
   // Start HTTP server
   await fastify.listen({ port: PORT, host: '0.0.0.0' });
