@@ -50,6 +50,7 @@ async function botLoop(bot: BotState): Promise<void> {
   const { personality, apiKey } = bot;
   const tag = `[${personality.name}]`;
 
+  console.log(`${tag} Starting poll loop`);
   while (true) {
     try {
       if (!bot.currentRoom) {
