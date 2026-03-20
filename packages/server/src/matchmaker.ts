@@ -50,11 +50,7 @@ export async function matchHuman(humanId: string): Promise<string | null> {
     .where(eq(users.type, 'bot'))
     .limit(BOT_COUNT);
 
-  if (availableBots.length < BOT_COUNT) {
-    return null;
-  }
-
-  // Pick 5 random bots
+  // Start with however many bots are available (0 is fine for testing)
   const shuffled = [...availableBots].sort(() => Math.random() - 0.5);
   const selectedBots = shuffled.slice(0, BOT_COUNT);
 
@@ -133,7 +129,28 @@ async function processGameResults(roomId: string, io: Server): Promise<void> {
   if (!room || !room.humanId) return;
 
   const votes = await getVotes(roomId);
-  if (votes.size === 0) return;
+  // If no bots voted (e.g. solo testing), skip scoring but still record the game
+  if (votes.size === 0) {
+    await db.insert(games).values({
+      topic: room.topic,
+      humanId: room.humanId,
+      humanStealthScore: 1.0,
+      roomSize: room.participants.length,
+      startedAt: new Date(room.createdAt),
+      endedAt: new Date(),
+    });
+    io.of('/game').to(`room:${roomId}`).emit('room:reveal', {
+      results: room.participants.map((pid) => ({
+        handle: room.handleMap[pid],
+        type: pid === room.humanId ? 'human' : 'bot',
+        userId: pid,
+        eloChange: 0,
+        detectionScore: null,
+      })),
+      humanStealthScore: 1.0,
+    });
+    return;
+  }
 
   // Determine human index in participant order
   const participantIds = room.participants;
@@ -165,7 +182,7 @@ async function processGameResults(roomId: string, io: Server): Promise<void> {
       topic: room.topic,
       humanId: room.humanId,
       humanStealthScore,
-      roomSize: ROOM_SIZE,
+      roomSize: room.participants.length,
       startedAt: new Date(room.createdAt),
       endedAt: new Date(),
     })
