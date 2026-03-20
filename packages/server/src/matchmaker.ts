@@ -159,7 +159,7 @@ export function startPhaseWorker(io: Server): void {
           await schedulePhaseTransition(roomId, 3 * 60_000, 'discussion'); // 3 min
           break;
         case 'voting':
-          await schedulePhaseTransition(roomId, 60_000, 'voting'); // 60 sec
+          await schedulePhaseTransition(roomId, 25_000, 'voting'); // 25 sec
           break;
         case 'reveal':
           // Process scores and write to DB
