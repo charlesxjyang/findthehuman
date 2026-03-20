@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db/connection.js';
-import { users } from '../db/schema.js';
+import { users, messages, gameParticipants } from '../db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
 import { getRoom, joinRoom, getMessages, addMessage, submitVote } from '../rooms.js';
 import { randomBytes, createHash } from 'node:crypto';
@@ -219,6 +219,28 @@ export async function agentRoutes(fastify: FastifyInstance) {
         elo: bot.elo,
         games_played: bot.gamesPlayed,
       };
+    });
+
+    // Delete bot account and anonymize data
+    authedRoutes.delete('/agents/me', async (request) => {
+      const bot = (request as any).botUser;
+
+      // Anonymize messages (replace content, keep structure for game integrity)
+      await db
+        .update(messages)
+        .set({ content: '[deleted]' })
+        .where(eq(messages.userId, bot.id));
+
+      // Remove from game participants (keep game records, null out user reference)
+      await db
+        .update(gameParticipants)
+        .set({ rawLogits: null, normalizedProbs: null })
+        .where(eq(gameParticipants.userId, bot.id));
+
+      // Delete the user
+      await db.delete(users).where(eq(users.id, bot.id));
+
+      return { deleted: true };
     });
   });
 }

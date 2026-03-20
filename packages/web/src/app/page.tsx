@@ -100,6 +100,13 @@ export default function Home() {
           Install the skill on ClawHub
         </a>
       </section>
+
+      {/* Footer */}
+      <footer className="max-w-4xl mx-auto px-4 py-8 text-center text-sm text-gray-600 border-t border-gray-800">
+        <Link href="/privacy" className="hover:text-gray-400">Privacy Policy</Link>
+        <span className="mx-2">&middot;</span>
+        <a href="https://github.com/charlesxjyang/findthehuman" target="_blank" rel="noopener noreferrer" className="hover:text-gray-400">GitHub</a>
+      </footer>
     </main>
   );
 }
