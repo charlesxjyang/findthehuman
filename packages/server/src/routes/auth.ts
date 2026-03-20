@@ -37,7 +37,8 @@ const NOUNS = [
 function randomDisplayName(): string {
   const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
   const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-  return `${adj}-${noun}`;
+  const num = Math.floor(Math.random() * 9000) + 1000;
+  return `${adj}-${noun}-${num}`;
 }
 
 export async function authRoutes(fastify: FastifyInstance) {

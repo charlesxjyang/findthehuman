@@ -1,5 +1,5 @@
 import { Queue, Worker, type ConnectionOptions } from 'bullmq';
-import { getRedis } from './redis.js';
+import Redis from 'ioredis';
 import { createRoom, joinRoom, assignHandles, advancePhase, getRoom, getVotes } from './rooms.js';
 import { computeScores, updateElo } from './scoring.js';
 import { db } from './db/connection.js';
@@ -7,8 +7,13 @@ import { users, games, gameParticipants } from './db/schema.js';
 import { eq } from 'drizzle-orm';
 import type { Server } from 'socket.io';
 
-function getRedisConnection(): ConnectionOptions {
-  return getRedis() as unknown as ConnectionOptions;
+function createBullMQConnection(): ConnectionOptions {
+  const url = process.env.REDIS_URL!;
+  return new Redis(url, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+    tls: url.startsWith('rediss://') ? {} : undefined,
+  }) as unknown as ConnectionOptions;
 }
 
 const ROOM_SIZE = 6;
@@ -20,7 +25,7 @@ let phaseWorker: Worker | null = null;
 export function getPhaseQueue(): Queue {
   if (!phaseQueue) {
     phaseQueue = new Queue('phase-transitions', {
-      connection: getRedisConnection(),
+      connection: createBullMQConnection(),
     });
   }
   return phaseQueue;
@@ -113,7 +118,7 @@ export function startPhaseWorker(io: Server): void {
           break;
       }
     },
-    { connection: getRedisConnection() },
+    { connection: createBullMQConnection() },
   );
 
   phaseWorker.on('failed', (job, err) => {

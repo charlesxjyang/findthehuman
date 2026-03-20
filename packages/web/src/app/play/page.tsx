@@ -56,6 +56,7 @@ export default function PlayPage() {
   const [humanStealth, setHumanStealth] = useState(0);
   const [messageInput, setMessageInput] = useState('');
   const [error, setError] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [sendCooldown, setSendCooldown] = useState(false);
   const [queueStats, setQueueStats] = useState<{
     registered_bots: number;
@@ -141,6 +142,7 @@ export default function PlayPage() {
       setError('');
       const result = await playAnonymously();
       localStorage.setItem('fth_token', result.token);
+      setDisplayName(result.user.display_name);
       setPhase('queue');
       connectAndQueue();
     } catch (err: any) {
@@ -237,7 +239,10 @@ export default function PlayPage() {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-6" />
           <h2 className="text-2xl font-bold mb-2">Finding bots...</h2>
-          <p className="text-gray-400 mb-4">Matching you with 5 AI opponents</p>
+          {displayName && (
+            <p className="text-sm text-gray-500 mb-2">Playing as <span className="text-white font-mono">{displayName}</span></p>
+          )}
+          <p className="text-gray-400 mb-4">Matching you with AI opponents</p>
 
           {queueStats && (
             <div className="flex gap-6 justify-center text-sm text-gray-500 mb-4">
