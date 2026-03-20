@@ -35,11 +35,11 @@ export function getPhaseQueue(): Queue {
 /**
  * Schedule the next phase transition for a room.
  */
-export async function schedulePhaseTransition(roomId: string, delayMs: number): Promise<void> {
+export async function schedulePhaseTransition(roomId: string, delayMs: number, expectedPhase?: string): Promise<void> {
   const queue = getPhaseQueue();
   await queue.add(
     'advance',
-    { roomId },
+    { roomId, expectedPhase },
     { delay: delayMs, removeOnComplete: true, removeOnFail: 100 },
   );
 }
@@ -51,8 +51,8 @@ export async function schedulePhaseTransition(roomId: string, delayMs: number): 
 export async function matchHuman(humanId: string): Promise<string | null> {
   const roomId = await createRoom(humanId);
 
-  // Schedule a "start anyway" timer — if not enough bots join in 30s, start with whoever is there
-  await schedulePhaseTransition(roomId, 30_000);
+  // Schedule a "start anyway" timer — if not enough bots join in 30s, timeout
+  await schedulePhaseTransition(roomId, 30_000, 'lobby');
 
   return roomId;
 }
@@ -84,7 +84,7 @@ async function startGame(roomId: string, io?: any): Promise<void> {
 
   await assignHandles(roomId);
   await advancePhase(roomId); // → topic_reveal
-  await schedulePhaseTransition(roomId, 10_000); // after 10s → discussion
+  await schedulePhaseTransition(roomId, 10_000, 'topic_reveal'); // after 10s → discussion
 
   // Notify WebSocket clients
   if (io) {
@@ -121,9 +121,14 @@ export function startPhaseWorker(io: Server): void {
   phaseWorker = new Worker(
     'phase-transitions',
     async (job) => {
-      const { roomId } = job.data;
+      const { roomId, expectedPhase } = job.data;
       const room = await getRoom(roomId);
       if (!room) return;
+
+      // Skip if the room has already moved past the expected phase
+      if (expectedPhase && room.phase !== expectedPhase) {
+        return;
+      }
 
       // If still in lobby, check if we have enough players
       if (room.phase === 'lobby') {
@@ -151,16 +156,16 @@ export function startPhaseWorker(io: Server): void {
       // Schedule next transition
       switch (newPhase) {
         case 'discussion':
-          await schedulePhaseTransition(roomId, 5 * 60_000); // 5 min
+          await schedulePhaseTransition(roomId, 5 * 60_000, 'discussion'); // 5 min
           break;
         case 'voting':
-          await schedulePhaseTransition(roomId, 60_000); // 60 sec
+          await schedulePhaseTransition(roomId, 60_000, 'voting'); // 60 sec
           break;
         case 'reveal':
           // Process scores and write to DB
           await processGameResults(roomId, io);
           // Auto-advance to complete after 30 seconds
-          await schedulePhaseTransition(roomId, 30_000);
+          await schedulePhaseTransition(roomId, 30_000, 'reveal');
           break;
         case 'complete':
           // Cleanup Redis state after a delay
