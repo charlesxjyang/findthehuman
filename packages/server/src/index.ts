@@ -7,6 +7,7 @@ import Redis from 'ioredis';
 import { agentRoutes } from './routes/agent.js';
 import { authRoutes } from './routes/auth.js';
 import { leaderboardRoutes } from './routes/leaderboard.js';
+import { statsRoutes } from './routes/stats.js';
 import { setupWebSocket } from './routes/ws.js';
 import { startPhaseWorker } from './matchmaker.js';
 
@@ -30,6 +31,7 @@ async function start() {
   await fastify.register(agentRoutes);
   await fastify.register(authRoutes);
   await fastify.register(leaderboardRoutes);
+  await fastify.register(statsRoutes);
 
   // Start HTTP server
   await fastify.listen({ port: PORT, host: '0.0.0.0' });
