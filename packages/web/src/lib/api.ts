@@ -19,7 +19,7 @@ async function fetchApi(path: string, options: RequestInit = {}) {
 }
 
 export async function playAnonymously() {
-  return fetchApi('/auth/anonymous', { method: 'POST' });
+  return fetchApi('/auth/anonymous', { method: 'POST', body: '{}' });
 }
 
 export async function getMe() {

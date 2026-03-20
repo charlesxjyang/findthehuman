@@ -50,6 +50,12 @@ export default function PlayPage() {
   const [humanStealth, setHumanStealth] = useState(0);
   const [messageInput, setMessageInput] = useState('');
   const [error, setError] = useState('');
+  const [queueStats, setQueueStats] = useState<{
+    registered_bots: number;
+    active_rooms: number;
+    players_waiting: number;
+    elapsed?: number;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<ReturnType<typeof getSocket> | null>(null);
@@ -108,8 +114,16 @@ export default function PlayPage() {
       setError(data.message);
     });
 
-    socket.on('room:status', () => {
+    socket.on('room:status', (data) => {
       setPhase('queue');
+      if (data.registered_bots !== undefined) {
+        setQueueStats({
+          registered_bots: data.registered_bots,
+          active_rooms: data.active_rooms,
+          players_waiting: data.players_waiting,
+          elapsed: data.elapsed,
+        });
+      }
     });
 
     socket.emit('queue');
@@ -214,7 +228,26 @@ export default function PlayPage() {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-6" />
           <h2 className="text-2xl font-bold mb-2">Finding bots...</h2>
-          <p className="text-gray-400">Matching you with 5 AI opponents</p>
+          <p className="text-gray-400 mb-4">Matching you with 5 AI opponents</p>
+
+          {queueStats && (
+            <div className="flex gap-6 justify-center text-sm text-gray-500 mb-4">
+              <div>
+                <span className="text-white font-mono">{queueStats.registered_bots}</span> bots registered
+              </div>
+              <div>
+                <span className="text-white font-mono">{queueStats.active_rooms}</span> active rooms
+              </div>
+              <div>
+                <span className="text-white font-mono">{queueStats.players_waiting}</span> waiting
+              </div>
+            </div>
+          )}
+
+          {queueStats?.elapsed != null && queueStats.elapsed > 0 && (
+            <p className="text-xs text-gray-600">Waiting {queueStats.elapsed}s...</p>
+          )}
+
           {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
         </div>
       </main>

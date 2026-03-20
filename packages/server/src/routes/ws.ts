@@ -2,8 +2,11 @@ import type { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { matchHuman } from '../matchmaker.js';
 import { getRoom, addMessage } from '../rooms.js';
+import { getQuickStats } from './stats.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const MATCH_POLL_INTERVAL = 5_000; // 5 seconds
+const MATCH_TIMEOUT = 120_000; // 2 minutes
 
 interface AuthPayload {
   userId: string;
@@ -33,45 +36,67 @@ export function setupWebSocket(io: Server) {
 
     // Human joins matchmaking queue
     socket.on('queue', async () => {
-      try {
-        socket.emit('room:status', { status: 'finding_bots' });
+      const stats = await getQuickStats();
+      socket.emit('room:status', { status: 'waiting_for_bots', ...stats });
 
-        const roomId = await matchHuman(userId);
-        if (!roomId) {
-          socket.emit('room:error', { message: 'Not enough bots available. Try again later.' });
+      const startTime = Date.now();
+      let matched = false;
+
+      const tryMatch = async () => {
+        if (matched || socket.disconnected) return;
+
+        try {
+          const roomId = await matchHuman(userId);
+          if (roomId) {
+            matched = true;
+
+            socket.join(`room:${roomId}`);
+            const room = await getRoom(roomId);
+            if (!room) {
+              socket.emit('room:error', { message: 'Room creation failed' });
+              return;
+            }
+
+            const participants = room.participants.map((pid) => ({
+              handle: room.handleMap[pid],
+            }));
+
+            socket.emit('room:joined', {
+              room_id: roomId,
+              participants,
+              your_handle: room.handleMap[userId],
+            });
+
+            socket.emit('room:phase', {
+              phase: room.phase,
+              timerEnd: room.timerEnd,
+              topic: room.topic,
+            });
+            return;
+          }
+        } catch (err) {
+          console.error('Match attempt error:', err);
+        }
+
+        // Check timeout
+        if (Date.now() - startTime > MATCH_TIMEOUT) {
+          socket.emit('room:error', {
+            message: 'No bots available right now. Please try again later.',
+          });
           return;
         }
 
-        // Join Socket.io room
-        socket.join(`room:${roomId}`);
-
-        const room = await getRoom(roomId);
-        if (!room) {
-          socket.emit('room:error', { message: 'Room creation failed' });
-          return;
-        }
-
-        // Send room:joined with participant handles (but not IDs)
-        const participants = room.participants.map((pid) => ({
-          handle: room.handleMap[pid],
-        }));
-
-        socket.emit('room:joined', {
-          room_id: roomId,
-          participants,
-          your_handle: room.handleMap[userId],
+        // Retry with fresh stats
+        const currentStats = await getQuickStats();
+        socket.emit('room:status', {
+          status: 'waiting_for_bots',
+          elapsed: Math.floor((Date.now() - startTime) / 1000),
+          ...currentStats,
         });
+        setTimeout(tryMatch, MATCH_POLL_INTERVAL);
+      };
 
-        // Send phase info
-        socket.emit('room:phase', {
-          phase: room.phase,
-          timerEnd: room.timerEnd,
-          topic: room.topic,
-        });
-      } catch (err) {
-        console.error('Queue error:', err);
-        socket.emit('room:error', { message: 'Failed to join queue' });
-      }
+      tryMatch();
     });
 
     // Human sends a chat message
@@ -103,7 +128,6 @@ export function setupWebSocket(io: Server) {
 
         const msg = await addMessage(room_id, userId, content);
 
-        // Broadcast to all in room (including sender)
         gameNsp.to(`room:${room_id}`).emit('room:message', {
           handle: msg.handle,
           content: msg.content,
@@ -116,7 +140,7 @@ export function setupWebSocket(io: Server) {
     });
 
     socket.on('disconnect', () => {
-      // Could handle cleanup here
+      // Cleanup handled by room timeout
     });
   });
 }
