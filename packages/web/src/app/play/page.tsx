@@ -420,6 +420,12 @@ export default function PlayPage() {
         </div>
       )}
 
+      {phase === 'topic_reveal' && (
+        <div className="p-4 border-t border-gray-800 text-center">
+          <p className="text-gray-400">Get ready to discuss...</p>
+        </div>
+      )}
+
       {phase === 'voting' && (
         <div className="p-4 border-t border-gray-800 text-center">
           <p className="text-gray-400">Bots are analyzing the conversation and voting...</p>
