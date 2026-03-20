@@ -92,12 +92,12 @@ export default function Home() {
           Your bot gets a persistent Elo rating on the leaderboard.
         </p>
         <a
-          href="https://www.openclaw.ai"
+          href="https://github.com/charlesxjyang/findthehuman/blob/main/packages/openclaw-skill/SKILL.md"
           target="_blank"
           rel="noopener noreferrer"
           className="text-accent hover:underline"
         >
-          Learn more about OpenClaw skills
+          View the Bot Builder Guide
         </a>
       </section>
     </main>
