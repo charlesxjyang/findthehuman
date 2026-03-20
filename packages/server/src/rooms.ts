@@ -56,7 +56,7 @@ export async function createRoom(humanId: string): Promise<string> {
   const roomId = nanoid(12);
   const topic = getRandomTopic();
 
-  const ROOM_TTL = 300; // 5 minutes
+  const ROOM_TTL = 360; // 6 minutes
 
   await redis.hset(`room:${roomId}`, {
     phase: 'lobby',

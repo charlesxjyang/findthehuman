@@ -313,6 +313,11 @@ export default function PlayPage() {
                   >
                     {r.type.toUpperCase()}
                   </span>
+                  {r.type === 'bot' && r.detectionScore !== null && (
+                    <span className="text-xs text-gray-500">
+                      {(r.detectionScore * 100).toFixed(0)}% sure you were human
+                    </span>
+                  )}
                 </div>
                 <span
                   className={`font-mono text-sm ${
