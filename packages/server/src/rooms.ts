@@ -56,7 +56,7 @@ export async function createRoom(humanId: string): Promise<string> {
   const roomId = nanoid(12);
   const topic = getRandomTopic();
 
-  const ROOM_TTL = 360; // 6 minutes
+  const ROOM_TTL = 240; // 4 minutes
 
   await redis.hset(`room:${roomId}`, {
     phase: 'lobby',
@@ -127,7 +127,7 @@ export async function advancePhase(roomId: string): Promise<RoomPhase> {
       timerEnd = new Date(now.getTime() + 10_000).toISOString(); // 10 sec
       break;
     case 'discussion':
-      timerEnd = new Date(now.getTime() + 5 * 60_000).toISOString(); // 5 min
+      timerEnd = new Date(now.getTime() + 3 * 60_000).toISOString(); // 3 min
       break;
     case 'voting':
       timerEnd = new Date(now.getTime() + 60_000).toISOString(); // 60 sec

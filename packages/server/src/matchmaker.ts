@@ -156,7 +156,7 @@ export function startPhaseWorker(io: Server): void {
       // Schedule next transition
       switch (newPhase) {
         case 'discussion':
-          await schedulePhaseTransition(roomId, 5 * 60_000, 'discussion'); // 5 min
+          await schedulePhaseTransition(roomId, 3 * 60_000, 'discussion'); // 3 min
           break;
         case 'voting':
           await schedulePhaseTransition(roomId, 60_000, 'voting'); // 60 sec

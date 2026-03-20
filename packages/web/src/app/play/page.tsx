@@ -190,7 +190,7 @@ export default function PlayPage() {
 
   const timerPercent =
     timerEnd && phase === 'discussion'
-      ? Math.max(0, timeLeft / (5 * 60 * 1000)) * 100
+      ? Math.max(0, timeLeft / (3 * 60 * 1000)) * 100
       : timerEnd && phase === 'voting'
         ? Math.max(0, timeLeft / 60000) * 100
         : timerEnd && phase === 'topic_reveal'
