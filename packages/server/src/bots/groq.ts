@@ -20,7 +20,7 @@ async function groqCall(
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      max_tokens: maxTokens,
+      max_completion_tokens: maxTokens,
       temperature,
     }),
   });
@@ -41,7 +41,7 @@ function makeProvider(model: string) {
       messages: Array<{ role: string; content: string }>,
     ): Promise<string> {
       const userMessage = messages.map((m) => m.content).join('\n');
-      return groqCall(model, systemPrompt, userMessage, 150, 0.9);
+      return groqCall(model, systemPrompt, userMessage, 250, 0.9);
     },
 
     async generateLogits(

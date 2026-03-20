@@ -82,6 +82,8 @@ export async function createRoom(humanId: string): Promise<string> {
   return roomId;
 }
 
+const MAX_ROOM_SIZE = 5;
+
 export async function joinRoom(roomId: string, userId: string): Promise<{ joined: boolean; participantCount: number }> {
   const redis = getRedis();
 
@@ -90,10 +92,23 @@ export async function joinRoom(roomId: string, userId: string): Promise<{ joined
     return { joined: false, participantCount: 0 };
   }
 
-  await redis.sadd(`room:${roomId}:participants`, userId);
-  const count = await redis.scard(`room:${roomId}:participants`);
+  // Atomic check-and-add: only add if under max size
+  const result = await redis.eval(
+    `local count = redis.call('scard', KEYS[1])
+     if count >= tonumber(ARGV[1]) then return -1 end
+     redis.call('sadd', KEYS[1], ARGV[2])
+     return redis.call('scard', KEYS[1])`,
+    1,
+    `room:${roomId}:participants`,
+    MAX_ROOM_SIZE,
+    userId,
+  ) as number;
 
-  return { joined: true, participantCount: count };
+  if (result === -1) {
+    return { joined: false, participantCount: 0 };
+  }
+
+  return { joined: true, participantCount: result };
 }
 
 export async function assignHandles(roomId: string): Promise<Record<string, string>> {

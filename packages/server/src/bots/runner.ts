@@ -91,18 +91,22 @@ async function botLoop(bot: BotState): Promise<void> {
       );
 
       if (messages.error) {
-        // Room might be gone
+        // Check if room moved to voting phase — try to vote
+        if (messages.error.includes('not in discussion') || messages.error.includes('Not in discussion')) {
+          await tryVote(bot);
+          continue;
+        }
         console.log(`${tag} Room ended or error: ${messages.error}`);
         bot.currentRoom = null;
         bot.currentTopic = null;
         continue;
       }
 
-      // During discussion: post messages with 10s base + random jitter
+      // During discussion: post messages with randomized timing
       const now = Date.now();
       const cooldown = 4000 + Math.floor(Math.random() * 5000); // 4-9s between messages
       if (
-        bot.messagesSent < 5 &&
+        bot.messagesSent < 15 &&
         now - bot.lastMessageTime > cooldown
       ) {
         try {
@@ -137,7 +141,7 @@ async function botLoop(bot: BotState): Promise<void> {
           console.error(`${tag} Chat error:`, err.message || err);
           // If room moved to voting, try voting
           if (err.message?.includes('not in discussion') || err.message?.includes('voting')) {
-            await tryVote(bot, messages);
+            await tryVote(bot);
           }
         }
       }
@@ -145,7 +149,7 @@ async function botLoop(bot: BotState): Promise<void> {
       await sleep(2000 + Math.floor(Math.random() * 3000)); // 2-5s poll interval
     } catch (err: any) {
       if (err.message?.includes('Not in discussion') || err.message?.includes('voting')) {
-        await tryVote(bot, []);
+        await tryVote(bot);
       }
       console.error(`${tag} Error:`, err.message || err);
       await sleep(3000);
@@ -153,51 +157,58 @@ async function botLoop(bot: BotState): Promise<void> {
   }
 }
 
-async function tryVote(bot: BotState, messages: any[]): Promise<void> {
+async function tryVote(bot: BotState): Promise<void> {
   if (!bot.currentRoom) return;
   const tag = `[${bot.personality.name}]`;
 
   try {
-    // Fetch all messages for voting analysis
+    // Get all messages for analysis
     const allMessages = await api(`/agents/rooms/${bot.currentRoom}/messages`, bot.apiKey);
-    if (allMessages.error) {
-      bot.currentRoom = null;
-      return;
-    }
+    const msgList = Array.isArray(allMessages) ? allMessages : [];
 
-    const msgList = allMessages as any[];
+    // Build conversation summary
     const handles = [...new Set(msgList.map((m: any) => m.handle))] as string[];
-
-    if (handles.length === 0) {
-      bot.currentRoom = null;
-      return;
-    }
-
     const conversationSummary = msgList
       .map((m: any) => `${m.handle}: ${m.content}`)
       .join('\n');
 
-    const llm = getLLM(bot.personality.provider);
-    const logits = await llm.generateLogits(
-      bot.personality.votePrompt,
-      conversationSummary,
-      handles,
-    );
+    if (handles.length === 0) {
+      // No messages — submit random logits
+      const logits = Array.from({ length: 5 }, () => Math.random() * 4 - 2);
+      await api(`/agents/rooms/${bot.currentRoom}/vote`, bot.apiKey, {
+        method: 'POST',
+        body: JSON.stringify({ logits }),
+      });
+    } else {
+      const llm = getLLM(bot.personality.provider);
+      const logits = await llm.generateLogits(
+        bot.personality.votePrompt,
+        conversationSummary,
+        handles,
+      );
 
-    const voteResult = await api(`/agents/rooms/${bot.currentRoom}/vote`, bot.apiKey, {
-      method: 'POST',
-      body: JSON.stringify({ logits }),
-    });
+      // Pad or trim logits to match room size (5 participants)
+      while (logits.length < 5) logits.push(Math.random() * 2 - 1);
+      const trimmed = logits.slice(0, 5);
 
-    if (voteResult.received) {
-      console.log(`${tag} Voted: ${logits.map((l) => l.toFixed(2)).join(', ')}`);
+      const voteResult = await api(`/agents/rooms/${bot.currentRoom}/vote`, bot.apiKey, {
+        method: 'POST',
+        body: JSON.stringify({ logits: trimmed }),
+      });
+
+      if (voteResult.received) {
+        console.log(`${tag} Voted: ${trimmed.map((l) => l.toFixed(2)).join(', ')}`);
+      } else {
+        console.log(`${tag} Vote failed: ${voteResult.error || 'unknown'}`);
+      }
     }
-
-    // Game over for this room
-    bot.currentRoom = null;
-  } catch {
-    // Not in voting phase yet, or already voted
+  } catch (err: any) {
+    console.error(`[${bot.personality.name}] Vote error:`, err.message || err);
   }
+
+  // Done with this room regardless
+  bot.currentRoom = null;
+  bot.currentTopic = null;
 }
 
 function sleep(ms: number): Promise<void> {

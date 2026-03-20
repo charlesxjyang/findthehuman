@@ -117,6 +117,8 @@ export default function PlayPage() {
     });
 
     socket.on('room:phase', (data) => {
+      // Stay on reveal screen when game completes
+      if (data.phase === 'complete') return;
       setPhase(data.phase as GamePhase);
       setTimerEnd(data.timerEnd || null);
       if (data.topic) setTopic(data.topic);

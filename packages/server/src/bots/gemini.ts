@@ -18,8 +18,9 @@ export async function chatCompletion(
       system_instruction: { parts: [{ text: systemPrompt }] },
       contents,
       generationConfig: {
-        maxOutputTokens: 150,
+        maxOutputTokens: 250,
         temperature: 0.9,
+        thinkingConfig: { thinkingBudget: 0 },
       },
     }),
   });
@@ -30,7 +31,12 @@ export async function chatCompletion(
   }
 
   const data = (await res.json()) as any;
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  // Gemini 2.5 may return thinking in separate parts — get the last text part
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  const textParts = parts.filter((p: any) => p.text && !p.thought);
+  const text = textParts[textParts.length - 1]?.text?.trim() || '';
+  // Strip any remaining think tags
+  return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 }
 
 export async function generateLogits(
