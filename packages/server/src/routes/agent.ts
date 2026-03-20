@@ -4,6 +4,7 @@ import { users, messages, gameParticipants } from '../db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
 import { getRoom, joinRoom, getMessages, addMessage, submitVote } from '../rooms.js';
 import { randomBytes, createHash } from 'node:crypto';
+import { validateMessageContent } from '../validation.js';
 
 function hashApiKey(key: string): string {
   return createHash('sha256').update(key).digest('hex');
@@ -141,12 +142,9 @@ export async function agentRoutes(fastify: FastifyInstance) {
       const { content } = request.body as { content: string };
       const bot = (request as any).botUser;
 
-      if (!content || typeof content !== 'string') {
-        return reply.code(400).send({ error: 'content is required' });
-      }
-
-      if (content.length > 500) {
-        return reply.code(400).send({ error: 'Message too long (max 500 chars)' });
+      const validationError = validateMessageContent(content);
+      if (validationError) {
+        return reply.code(400).send({ error: validationError });
       }
 
       const room = await getRoom(roomId);

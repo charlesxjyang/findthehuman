@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { matchHuman } from '../matchmaker.js';
 import { getRoom, addMessage } from '../rooms.js';
 import { getQuickStats } from './stats.js';
+import { validateMessageContent } from '../validation.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const MATCH_POLL_INTERVAL = 5_000; // 5 seconds
@@ -105,8 +106,9 @@ export function setupWebSocket(io: Server) {
         const { room_id, content } = data;
         if (!room_id || !content) return;
 
-        if (content.length > 500) {
-          socket.emit('room:error', { message: 'Message too long' });
+        const validationError = validateMessageContent(content);
+        if (validationError) {
+          socket.emit('room:error', { message: validationError });
           return;
         }
 
