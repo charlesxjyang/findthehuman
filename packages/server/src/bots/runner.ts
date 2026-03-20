@@ -14,6 +14,7 @@ interface BotState {
   userId: string;
   apiKey: string;
   currentRoom: string | null;
+  currentTopic: string | null;
   messagesSent: number;
   lastMessageTime: number;
 }
@@ -65,8 +66,9 @@ async function botLoop(bot: BotState): Promise<void> {
           });
           if (joinResult.joined) {
             bot.currentRoom = room.room_id;
+            bot.currentTopic = joinResult.topic || room.topic;
             bot.messagesSent = 0;
-            console.log(`${tag} Joined room ${room.room_id} (${joinResult.participants} players)`);
+            console.log(`${tag} Joined room ${room.room_id} — topic: "${bot.currentTopic}"`);
           } else {
             console.log(`${tag} Failed to join: ${joinResult.error || 'unknown'}`);
           }
@@ -87,6 +89,7 @@ async function botLoop(bot: BotState): Promise<void> {
         // Room might be gone
         console.log(`${tag} Room ended or error: ${messages.error}`);
         bot.currentRoom = null;
+        bot.currentTopic = null;
         continue;
       }
 
@@ -102,10 +105,10 @@ async function botLoop(bot: BotState): Promise<void> {
             content: `${m.handle}: ${m.content}`,
           }));
 
-          // Get topic from most recent room state
+          const topic = bot.currentTopic || 'a general topic';
           const topicContext = chatHistory.length > 0
-            ? `The discussion topic is being discussed. Recent messages:\n${chatHistory.slice(-10).map((m: any) => m.content).join('\n')}\n\nContribute to the conversation naturally.`
-            : 'The discussion has just started. Share your initial thoughts on the topic.';
+            ? `The topic is: "${topic}"\n\nRecent messages:\n${chatHistory.slice(-10).map((m: any) => m.content).join('\n')}\n\nContribute to the conversation naturally. Stay on topic.`
+            : `The topic is: "${topic}"\n\nThe discussion has just started. Share your initial thoughts.`;
 
           const llm = getLLM(personality.provider);
           const response = await llm.chatCompletion(personality.chatStyle, [
@@ -205,6 +208,7 @@ async function main() {
       userId,
       apiKey,
       currentRoom: null,
+      currentTopic: null,
       messagesSent: 0,
       lastMessageTime: 0,
     });
