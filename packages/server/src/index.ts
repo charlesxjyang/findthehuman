@@ -13,6 +13,7 @@ import { leaderboardRoutes } from './routes/leaderboard.js';
 import { statsRoutes } from './routes/stats.js';
 import { setupWebSocket } from './routes/ws.js';
 import { startPhaseWorker } from './matchmaker.js';
+import { ensureSubmolt } from './moltbook.js';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
@@ -100,6 +101,12 @@ async function start() {
   if (process.env.REDIS_URL) {
     startPhaseWorker(io);
     fastify.log.info('Phase transition worker started');
+  }
+
+  // Create Moltbook submolt (best-effort)
+  if (process.env.MOLTBOOK_API_KEY) {
+    ensureSubmolt().catch(() => {});
+    fastify.log.info('Moltbook integration enabled');
   }
 
   fastify.log.info(`Server listening on port ${PORT}`);

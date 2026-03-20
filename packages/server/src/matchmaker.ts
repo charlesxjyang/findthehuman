@@ -6,6 +6,7 @@ import { db } from './db/connection.js';
 import { users, games, gameParticipants } from './db/schema.js';
 import { eq } from 'drizzle-orm';
 import type { Server } from 'socket.io';
+import { postGameResult } from './moltbook.js';
 
 function createBullMQConnection(): ConnectionOptions {
   const url = process.env.REDIS_URL!;
@@ -154,6 +155,12 @@ async function processGameResults(roomId: string, io: Server): Promise<void> {
       })),
       humanStealthScore: 1.0,
     });
+    postGameResult({
+      topic: room.topic,
+      humanHandle: room.handleMap[room.humanId],
+      humanStealthScore: 1.0,
+      botCount: room.participants.length - 1,
+    }).catch(() => {});
     return;
   }
 
@@ -266,4 +273,18 @@ async function processGameResults(roomId: string, io: Server): Promise<void> {
     humanStealthScore,
     gameId: game.id,
   });
+
+  // Post to Moltbook (best-effort, fire and forget)
+  const topBot = botResults.reduce((best, r) =>
+    r.detectionScore > (best?.detectionScore ?? 0) ? r : best, botResults[0]);
+  postGameResult({
+    topic: room.topic,
+    humanHandle: room.handleMap[room.humanId],
+    humanStealthScore,
+    botCount: botResults.length,
+    topDetector: topBot ? {
+      handle: room.handleMap[topBot.botUserId],
+      score: topBot.detectionScore,
+    } : undefined,
+  }).catch(() => {});
 }
