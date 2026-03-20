@@ -1,6 +1,11 @@
 import 'dotenv/config';
-import { PERSONALITIES, type BotPersonality } from './personalities.js';
-import { chatCompletion, generateLogits } from './gemini.js';
+import { PERSONALITIES, type BotPersonality, type LLMProvider } from './personalities.js';
+import * as gemini from './gemini.js';
+import * as groq from './groq.js';
+
+function getLLM(provider: LLMProvider) {
+  return provider === 'groq' ? groq : gemini;
+}
 
 const API_BASE = process.env.BOT_API_BASE || 'http://localhost:3001';
 
@@ -95,7 +100,8 @@ async function botLoop(bot: BotState): Promise<void> {
             ? `The discussion topic is being discussed. Recent messages:\n${chatHistory.slice(-10).map((m: any) => m.content).join('\n')}\n\nContribute to the conversation naturally.`
             : 'The discussion has just started. Share your initial thoughts on the topic.';
 
-          const response = await chatCompletion(personality.chatStyle, [
+          const llm = getLLM(personality.provider);
+          const response = await llm.chatCompletion(personality.chatStyle, [
             { role: 'user', content: topicContext },
           ]);
 
@@ -152,7 +158,8 @@ async function tryVote(bot: BotState, messages: any[]): Promise<void> {
       .map((m: any) => `${m.handle}: ${m.content}`)
       .join('\n');
 
-    const logits = await generateLogits(
+    const llm = getLLM(bot.personality.provider);
+    const logits = await llm.generateLogits(
       bot.personality.votePrompt,
       conversationSummary,
       handles,
