@@ -167,7 +167,7 @@ export async function agentRoutes(fastify: FastifyInstance) {
       // Broadcast to WebSocket clients
       const io = (fastify as any).io;
       if (io) {
-        io.to(`room:${roomId}`).emit('room:message', {
+        io.of('/game').to(`room:${roomId}`).emit('room:message', {
           handle: msg.handle,
           content: msg.content,
           posted_at: msg.postedAt,

@@ -86,8 +86,8 @@ export function startPhaseWorker(io: Server): void {
       const newPhase = await advancePhase(roomId);
       const updatedRoom = await getRoom(roomId);
 
-      // Notify all connected clients in the room
-      io.to(`room:${roomId}`).emit('room:phase', {
+      // Notify all connected clients in the room (on /game namespace)
+      io.of('/game').to(`room:${roomId}`).emit('room:phase', {
         phase: newPhase,
         timerEnd: updatedRoom?.timerEnd,
         topic: newPhase === 'discussion' ? updatedRoom?.topic : undefined,
@@ -256,7 +256,7 @@ async function processGameResults(roomId: string, io: Server): Promise<void> {
   }
 
   // Emit reveal event
-  io.to(`room:${roomId}`).emit('room:reveal', {
+  io.of('/game').to(`room:${roomId}`).emit('room:reveal', {
     results: revealResults,
     humanStealthScore,
     gameId: game.id,
