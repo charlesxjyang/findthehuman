@@ -56,7 +56,7 @@ export async function createRoom(humanId: string): Promise<string> {
   const roomId = nanoid(12);
   const topic = getRandomTopic();
 
-  const ROOM_TTL = 240; // 4 minutes
+  const ROOM_TTL = 600; // 10 minutes — must outlast full game (lobby + 10s + 3min + 60s + reveal)
 
   await redis.hset(`room:${roomId}`, {
     phase: 'lobby',

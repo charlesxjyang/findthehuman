@@ -127,9 +127,12 @@ async function botLoop(bot: BotState): Promise<void> {
               console.log(`${tag} Sent message ${bot.messagesSent}/5: "${response.substring(0, 60)}..."`);
             }
           }
-        } catch (err) {
-          // Might not be in discussion phase — try voting
-          await tryVote(bot, messages);
+        } catch (err: any) {
+          console.error(`${tag} Chat error:`, err.message || err);
+          // If room moved to voting, try voting
+          if (err.message?.includes('not in discussion') || err.message?.includes('voting')) {
+            await tryVote(bot, messages);
+          }
         }
       }
 
