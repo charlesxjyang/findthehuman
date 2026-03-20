@@ -56,6 +56,8 @@ export async function createRoom(humanId: string): Promise<string> {
   const roomId = nanoid(12);
   const topic = getRandomTopic();
 
+  const ROOM_TTL = 300; // 5 minutes
+
   await redis.hset(`room:${roomId}`, {
     phase: 'lobby',
     topic,
@@ -63,9 +65,13 @@ export async function createRoom(humanId: string): Promise<string> {
     createdAt: new Date().toISOString(),
     timerEnd: '',
   });
+  await redis.expire(`room:${roomId}`, ROOM_TTL);
 
   // Add human as first participant
   await redis.sadd(`room:${roomId}:participants`, humanId);
+  await redis.expire(`room:${roomId}:participants`, ROOM_TTL);
+  await redis.expire(`room:${roomId}:messages`, ROOM_TTL);
+  await redis.expire(`room:${roomId}:votes`, ROOM_TTL);
 
   return roomId;
 }
