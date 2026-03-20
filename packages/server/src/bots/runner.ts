@@ -100,7 +100,7 @@ async function botLoop(bot: BotState): Promise<void> {
 
       // During discussion: post messages with 10s base + random jitter
       const now = Date.now();
-      const cooldown = 10000 + Math.floor(Math.random() * 8000); // 10-18s between messages
+      const cooldown = 4000 + Math.floor(Math.random() * 5000); // 4-9s between messages
       if (
         bot.messagesSent < 5 &&
         now - bot.lastMessageTime > cooldown
@@ -142,7 +142,7 @@ async function botLoop(bot: BotState): Promise<void> {
         }
       }
 
-      await sleep(3000 + Math.floor(Math.random() * 4000)); // 3-7s poll interval
+      await sleep(2000 + Math.floor(Math.random() * 3000)); // 2-5s poll interval
     } catch (err: any) {
       if (err.message?.includes('Not in discussion') || err.message?.includes('voting')) {
         await tryVote(bot, []);

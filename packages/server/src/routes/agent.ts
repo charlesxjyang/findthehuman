@@ -129,7 +129,7 @@ export async function agentRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: 'Room is not in lobby state' });
       }
 
-      if (room.participants.length >= 6) {
+      if (room.participants.length >= 5) {
         return reply.code(400).send({ error: 'Room is full' });
       }
 

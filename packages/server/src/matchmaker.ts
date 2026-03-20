@@ -17,8 +17,8 @@ function createBullMQConnection(): ConnectionOptions {
   }) as unknown as ConnectionOptions;
 }
 
-const ROOM_SIZE = 6;
-const BOT_COUNT = 5;
+const ROOM_SIZE = 5;
+const BOT_COUNT = 4;
 
 let phaseQueue: Queue | null = null;
 let phaseWorker: Worker | null = null;
