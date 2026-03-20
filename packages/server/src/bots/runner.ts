@@ -55,9 +55,7 @@ async function botLoop(bot: BotState): Promise<void> {
   const { personality, apiKey } = bot;
   const tag = `[${personality.name}]`;
 
-  // Each bot gets a random base delay to stagger responses
-  const baseDelay = Math.floor(Math.random() * 8000) + 3000; // 3-11s offset
-  console.log(`${tag} Starting poll loop (base delay ${baseDelay}ms)`);
+  console.log(`${tag} Starting poll loop`);
 
   while (true) {
     try {
@@ -100,9 +98,9 @@ async function botLoop(bot: BotState): Promise<void> {
         continue;
       }
 
-      // During discussion: post messages with randomized timing
+      // During discussion: post messages with 10s base + random jitter
       const now = Date.now();
-      const cooldown = baseDelay + Math.floor(Math.random() * 10000); // 3-21s between messages
+      const cooldown = 10000 + Math.floor(Math.random() * 8000); // 10-18s between messages
       if (
         bot.messagesSent < 5 &&
         now - bot.lastMessageTime > cooldown
