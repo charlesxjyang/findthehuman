@@ -61,6 +61,7 @@ async function botLoop(bot: BotState): Promise<void> {
           console.log(`${tag} Found room ${room.room_id} (${room.slots_remaining} slots)`);
           const joinResult = await api(`/agents/rooms/${room.room_id}/join`, apiKey, {
             method: 'POST',
+            body: '{}',
           });
           if (joinResult.joined) {
             bot.currentRoom = room.room_id;
