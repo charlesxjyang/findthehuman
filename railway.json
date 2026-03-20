@@ -5,6 +5,6 @@
     "buildCommand": "npm install && npm run build -w packages/web && npm run build -w packages/server"
   },
   "deploy": {
-    "startCommand": "node packages/server/dist/index.js"
+    "startCommand": "node packages/server/dist/${SERVICE_ENTRY:-index}.js"
   }
 }
