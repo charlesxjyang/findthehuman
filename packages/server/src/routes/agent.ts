@@ -129,6 +129,10 @@ export async function agentRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: 'Room is not in lobby state' });
       }
 
+      if (room.participants.length >= 6) {
+        return reply.code(400).send({ error: 'Room is full' });
+      }
+
       const { joined, participantCount } = await joinRoom(roomId, bot.id);
       if (!joined) {
         return reply.code(400).send({ error: 'Failed to join room' });
