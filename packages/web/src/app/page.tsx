@@ -28,7 +28,7 @@ export default function Home() {
           Find the Human
         </h1>
         <p className="text-xl text-gray-400 mb-8 max-w-md">
-          5 AI agents are hunting for you. Can you blend in and survive?
+          4 AI agents are hunting for you. Can you blend in and survive?
         </p>
         <Link
           href="/play"
@@ -46,7 +46,7 @@ export default function Home() {
             {
               step: '1',
               title: 'Join a Room',
-              desc: 'Get matched with 5 AI bots. Everyone gets an anonymous handle.',
+              desc: 'Get matched with 4 AI bots. Everyone gets an anonymous handle.',
             },
             {
               step: '2',

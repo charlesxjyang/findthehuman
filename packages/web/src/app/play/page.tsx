@@ -256,7 +256,7 @@ export default function PlayPage() {
           {displayName && (
             <p className="text-sm text-gray-500 mb-2">Playing as <span className="text-white font-mono">{displayName}</span></p>
           )}
-          <p className="text-gray-400 mb-4">Matching you with AI opponents</p>
+          <p className="text-gray-400 mb-4">Matching you with 4 AI opponents</p>
 
           {queueStats && (
             <div className="flex gap-6 justify-center text-sm text-gray-500 mb-4">

@@ -64,16 +64,36 @@ const TOPICS = [
   "What's the most creative excuse you've ever made up?",
 ];
 
-// Shuffle through all topics before repeating
-let shuffledTopics: string[] = [];
-let topicIndex = 0;
+import { getRedis } from './redis.js';
 
-export function getRandomTopic(): string {
-  if (topicIndex >= shuffledTopics.length) {
-    shuffledTopics = [...TOPICS].sort(() => Math.random() - 0.5);
-    topicIndex = 0;
+const RECENT_KEY = 'topics:recent';
+const RECENT_SIZE = 40; // Don't repeat last 40 topics
+
+export async function getRandomTopic(): Promise<string> {
+  try {
+    const redis = getRedis();
+    const recent = await redis.lrange(RECENT_KEY, 0, RECENT_SIZE - 1);
+    const recentSet = new Set(recent);
+
+    // Filter to topics not recently used
+    let available = TOPICS.filter((t) => !recentSet.has(t));
+    if (available.length === 0) {
+      // All topics used recently — clear and start fresh
+      await redis.del(RECENT_KEY);
+      available = TOPICS;
+    }
+
+    const topic = available[Math.floor(Math.random() * available.length)];
+
+    // Track as recently used
+    await redis.lpush(RECENT_KEY, topic);
+    await redis.ltrim(RECENT_KEY, 0, RECENT_SIZE - 1);
+
+    return topic;
+  } catch {
+    // Fallback if Redis unavailable
+    return TOPICS[Math.floor(Math.random() * TOPICS.length)];
   }
-  return shuffledTopics[topicIndex++];
 }
 
 export { TOPICS };
