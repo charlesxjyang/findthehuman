@@ -37,9 +37,15 @@ const HANDLE_COLORS = ['Red', 'Blue', 'Green', 'Purple', 'Orange', 'Teal'];
 const HANDLE_ANIMALS = ['Fox', 'Owl', 'Wolf', 'Lynx', 'Crow', 'Hare', 'Moth', 'Wren', 'Deer', 'Newt'];
 
 function generateHandles(count: number): string[] {
-  const animals = shuffleArray(HANDLE_ANIMALS).slice(0, count);
-  const colors = shuffleArray(HANDLE_COLORS).slice(0, count);
-  return colors.map((c, i) => `${c} ${animals[i]}`);
+  const handles: string[] = [];
+  const colors = shuffleArray(HANDLE_COLORS);
+  const animals = shuffleArray(HANDLE_ANIMALS);
+  for (let i = 0; i < count; i++) {
+    const color = colors[i % colors.length];
+    const animal = animals[i % animals.length];
+    handles.push(`${color} ${animal}`);
+  }
+  return handles;
 }
 
 function shuffleArray<T>(arr: T[]): T[] {

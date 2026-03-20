@@ -64,8 +64,16 @@ const TOPICS = [
   "What's the most creative excuse you've ever made up?",
 ];
 
+// Shuffle through all topics before repeating
+let shuffledTopics: string[] = [];
+let topicIndex = 0;
+
 export function getRandomTopic(): string {
-  return TOPICS[Math.floor(Math.random() * TOPICS.length)];
+  if (topicIndex >= shuffledTopics.length) {
+    shuffledTopics = [...TOPICS].sort(() => Math.random() - 0.5);
+    topicIndex = 0;
+  }
+  return shuffledTopics[topicIndex++];
 }
 
 export { TOPICS };

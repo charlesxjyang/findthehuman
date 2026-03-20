@@ -34,7 +34,8 @@ const HANDLE_COLOR_MAP: Record<string, string> = {
 
 const FALLBACK_COLORS = ['text-cyan-400', 'text-pink-400', 'text-yellow-400', 'text-green-400', 'text-purple-400', 'text-orange-400'];
 
-function getHandleColor(handle: string): string {
+function getHandleColor(handle: string | undefined): string {
+  if (!handle) return 'text-gray-400';
   const colorWord = handle.split(' ')[0];
   if (HANDLE_COLOR_MAP[colorWord]) return HANDLE_COLOR_MAP[colorWord];
   // Fallback: hash the handle string
