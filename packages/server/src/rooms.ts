@@ -1,6 +1,10 @@
 import { getRedis } from './redis.js';
 import { getRandomTopic } from './topics.js';
-import { nanoid } from 'nanoid';
+import { randomUUID, randomBytes } from 'node:crypto';
+
+function nanoid(size: number = 12): string {
+  return randomBytes(size).toString('base64url').slice(0, size);
+}
 
 export type RoomPhase =
   | 'lobby'
