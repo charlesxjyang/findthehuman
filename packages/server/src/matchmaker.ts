@@ -45,37 +45,67 @@ export async function schedulePhaseTransition(roomId: string, delayMs: number): 
 }
 
 /**
- * Try to match a human with available bots and start a game.
- * Returns roomId if successful, null if not enough bots available.
+ * Create a lobby room for a human. Bots join via REST API polling.
+ * Returns roomId immediately. Game starts when enough bots join or after timeout.
  */
 export async function matchHuman(humanId: string): Promise<string | null> {
-  // Find available bots from the database
-  const availableBots = await db
-    .select()
-    .from(users)
-    .where(eq(users.type, 'bot'))
-    .limit(BOT_COUNT);
-
-  // Start with however many bots are available (0 is fine for testing)
-  const shuffled = [...availableBots].sort(() => Math.random() - 0.5);
-  const selectedBots = shuffled.slice(0, BOT_COUNT);
-
-  // Create room
   const roomId = await createRoom(humanId);
 
-  // Bots join the room
-  for (const bot of selectedBots) {
-    await joinRoom(roomId, bot.id);
+  // Schedule a "start anyway" timer — if not enough bots join in 30s, start with whoever is there
+  await schedulePhaseTransition(roomId, 30_000);
+
+  return roomId;
+}
+
+/**
+ * Called when a bot joins a room. If we have enough participants, start the game.
+ */
+export async function checkAndStartRoom(roomId: string, io?: any): Promise<void> {
+  const room = await getRoom(roomId);
+  if (!room || room.phase !== 'lobby') return;
+
+  const participantCount = room.participants.length;
+
+  // Start when we have the human + 5 bots (or at least human + 2 bots)
+  if (participantCount >= ROOM_SIZE || participantCount >= 3) {
+    await startGame(roomId, io);
   }
+}
 
-  // Assign random handles
+async function startGame(roomId: string, io?: any): Promise<void> {
+  const room = await getRoom(roomId);
+  if (!room || room.phase !== 'lobby') return;
+
   await assignHandles(roomId);
-
-  // Transition to topic_reveal and schedule timers
   await advancePhase(roomId); // → topic_reveal
   await schedulePhaseTransition(roomId, 10_000); // after 10s → discussion
 
-  return roomId;
+  // Notify WebSocket clients
+  if (io) {
+    const updatedRoom = await getRoom(roomId);
+    if (!updatedRoom) return;
+
+    const participants = updatedRoom.participants.map((pid) => ({
+      handle: updatedRoom.handleMap[pid],
+    }));
+
+    // Send room:joined to each socket with their specific handle
+    const sockets = await io.of('/game').in(`room:${roomId}`).fetchSockets();
+    for (const sock of sockets) {
+      const sockUserId = (sock as any).userId;
+      sock.emit('room:joined', {
+        room_id: roomId,
+        participants,
+        your_handle: updatedRoom.handleMap[sockUserId] || participants[0]?.handle,
+      });
+    }
+
+    io.of('/game').to(`room:${roomId}`).emit('room:phase', {
+      phase: updatedRoom.phase,
+      timerEnd: updatedRoom.timerEnd,
+      topic: updatedRoom.topic,
+    });
+  }
 }
 
 /**
@@ -88,6 +118,19 @@ export function startPhaseWorker(io: Server): void {
       const { roomId } = job.data;
       const room = await getRoom(roomId);
       if (!room) return;
+
+      // If still in lobby, try to start the game
+      if (room.phase === 'lobby') {
+        if (room.participants.length < 2) {
+          // Not enough players — notify and clean up
+          io.of('/game').to(`room:${roomId}`).emit('room:error', {
+            message: 'Not enough bots available right now. Please try again later.',
+          });
+          return;
+        }
+        await startGame(roomId, io);
+        return;
+      }
 
       const newPhase = await advancePhase(roomId);
       const updatedRoom = await getRoom(roomId);

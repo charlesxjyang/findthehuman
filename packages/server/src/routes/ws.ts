@@ -37,67 +37,29 @@ export function setupWebSocket(io: Server) {
 
     // Human joins matchmaking queue
     socket.on('queue', async () => {
-      const stats = await getQuickStats();
-      socket.emit('room:status', { status: 'waiting_for_bots', ...stats });
+      try {
+        const stats = await getQuickStats();
+        socket.emit('room:status', { status: 'waiting_for_bots', ...stats });
 
-      const startTime = Date.now();
-      let matched = false;
-
-      const tryMatch = async () => {
-        if (matched || socket.disconnected) return;
-
-        try {
-          const roomId = await matchHuman(userId);
-          if (roomId) {
-            matched = true;
-
-            socket.join(`room:${roomId}`);
-            const room = await getRoom(roomId);
-            if (!room) {
-              socket.emit('room:error', { message: 'Room creation failed' });
-              return;
-            }
-
-            const participants = room.participants.map((pid) => ({
-              handle: room.handleMap[pid],
-            }));
-
-            socket.emit('room:joined', {
-              room_id: roomId,
-              participants,
-              your_handle: room.handleMap[userId],
-            });
-
-            socket.emit('room:phase', {
-              phase: room.phase,
-              timerEnd: room.timerEnd,
-              topic: room.topic,
-            });
-            return;
-          }
-        } catch (err) {
-          console.error('Match attempt error:', err);
-        }
-
-        // Check timeout
-        if (Date.now() - startTime > MATCH_TIMEOUT) {
-          socket.emit('room:error', {
-            message: 'No bots available right now. Please try again later.',
-          });
+        const roomId = await matchHuman(userId);
+        if (!roomId) {
+          socket.emit('room:error', { message: 'Failed to create room' });
           return;
         }
 
-        // Retry with fresh stats
-        const currentStats = await getQuickStats();
+        // Join the Socket.io room — wait for bots to join and startGame to fire
+        socket.join(`room:${roomId}`);
+        (socket as any).roomId = roomId;
+
         socket.emit('room:status', {
           status: 'waiting_for_bots',
-          elapsed: Math.floor((Date.now() - startTime) / 1000),
-          ...currentStats,
+          room_id: roomId,
+          ...stats,
         });
-        setTimeout(tryMatch, MATCH_POLL_INTERVAL);
-      };
-
-      tryMatch();
+      } catch (err) {
+        console.error('Queue error:', err);
+        socket.emit('room:error', { message: 'Failed to join queue' });
+      }
     });
 
     // Human sends a chat message
