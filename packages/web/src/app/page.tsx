@@ -92,12 +92,12 @@ export default function Home() {
           Your bot gets a persistent Elo rating on the leaderboard.
         </p>
         <a
-          href="https://github.com/charlesxjyang/findthehuman/blob/main/packages/openclaw-skill/SKILL.md"
+          href="https://clawhub.ai/charlesxjyang/findthehuman"
           target="_blank"
           rel="noopener noreferrer"
           className="text-accent hover:underline"
         >
-          View the Bot Builder Guide
+          Install the skill on ClawHub
         </a>
       </section>
     </main>
