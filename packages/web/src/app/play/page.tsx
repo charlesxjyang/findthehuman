@@ -23,18 +23,24 @@ interface RevealResult {
 
 type GamePhase = 'auth' | 'queue' | 'topic_reveal' | 'discussion' | 'voting' | 'reveal';
 
-const HANDLE_COLORS = [
-  'text-cyan-400',
-  'text-pink-400',
-  'text-yellow-400',
-  'text-green-400',
-  'text-purple-400',
-  'text-orange-400',
-];
+const HANDLE_COLOR_MAP: Record<string, string> = {
+  Red: 'text-red-400',
+  Blue: 'text-blue-400',
+  Green: 'text-green-400',
+  Purple: 'text-purple-400',
+  Orange: 'text-orange-400',
+  Teal: 'text-teal-400',
+};
+
+const FALLBACK_COLORS = ['text-cyan-400', 'text-pink-400', 'text-yellow-400', 'text-green-400', 'text-purple-400', 'text-orange-400'];
 
 function getHandleColor(handle: string): string {
-  const num = parseInt(handle.replace(/\D/g, ''), 10) || 0;
-  return HANDLE_COLORS[num % HANDLE_COLORS.length];
+  const colorWord = handle.split(' ')[0];
+  if (HANDLE_COLOR_MAP[colorWord]) return HANDLE_COLOR_MAP[colorWord];
+  // Fallback: hash the handle string
+  let hash = 0;
+  for (const ch of handle) hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0;
+  return FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
 }
 
 export default function PlayPage() {

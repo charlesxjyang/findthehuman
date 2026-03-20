@@ -21,15 +21,23 @@ function issueAnonToken(userId: string): string {
   return jwt.sign({ userId, type: 'human' }, JWT_SECRET, { expiresIn: '24h' });
 }
 
-// Random display names for anonymous users
-const ADJECTIVES = ['Sneaky', 'Clever', 'Silent', 'Swift', 'Bold', 'Witty', 'Cosmic', 'Lucky', 'Mystic', 'Phantom'];
-const ANIMALS = ['Fox', 'Owl', 'Wolf', 'Lynx', 'Raven', 'Falcon', 'Panda', 'Otter', 'Tiger', 'Hawk'];
+// GitHub-style random display names for anonymous users
+const ADJECTIVES = [
+  'fluffy', 'scaling', 'turbo', 'fuzzy', 'glowing', 'organic', 'sturdy',
+  'curly', 'shiny', 'humble', 'zesty', 'literate', 'upgraded', 'bookish',
+  'verbose', 'miniature', 'probable', 'fictional', 'symmetrical', 'animated',
+];
+const NOUNS = [
+  'pancake', 'barnacle', 'umbrella', 'telegram', 'waffle', 'doodle',
+  'parakeet', 'invention', 'adventure', 'sniffle', 'chainmail', 'broccoli',
+  'eureka', 'fishstick', 'guacamole', 'mnemonic', 'spork', 'potato',
+  'tribble', 'octopus',
+];
 
 function randomDisplayName(): string {
   const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-  const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-  const num = Math.floor(Math.random() * 100);
-  return `${adj}${animal}${num}`;
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  return `${adj}-${noun}`;
 }
 
 export async function authRoutes(fastify: FastifyInstance) {

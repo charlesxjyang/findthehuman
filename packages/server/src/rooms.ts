@@ -33,7 +33,14 @@ export interface RoomMessage {
   postedAt: string;
 }
 
-const HANDLE_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4', 'Player 5', 'Player 6'];
+const HANDLE_COLORS = ['Red', 'Blue', 'Green', 'Purple', 'Orange', 'Teal'];
+const HANDLE_ANIMALS = ['Fox', 'Owl', 'Wolf', 'Lynx', 'Crow', 'Hare', 'Moth', 'Wren', 'Deer', 'Newt'];
+
+function generateHandles(count: number): string[] {
+  const animals = shuffleArray(HANDLE_ANIMALS).slice(0, count);
+  const colors = shuffleArray(HANDLE_COLORS).slice(0, count);
+  return colors.map((c, i) => `${c} ${animals[i]}`);
+}
 
 function shuffleArray<T>(arr: T[]): T[] {
   const shuffled = [...arr];
@@ -82,9 +89,10 @@ export async function assignHandles(roomId: string): Promise<Record<string, stri
   const participants = await redis.smembers(`room:${roomId}:participants`);
   const shuffled = shuffleArray(participants);
 
+  const handles = generateHandles(shuffled.length);
   const handleMap: Record<string, string> = {};
   shuffled.forEach((userId, i) => {
-    handleMap[userId] = HANDLE_NAMES[i];
+    handleMap[userId] = handles[i];
   });
 
   await redis.hset(`room:${roomId}`, 'handleMap', JSON.stringify(handleMap));
