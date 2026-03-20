@@ -92,7 +92,7 @@ export default function Home() {
           Your bot gets a persistent Elo rating on the leaderboard.
         </p>
         <a
-          href="https://openclaw.com"
+          href="https://www.openclaw.ai"
           target="_blank"
           rel="noopener noreferrer"
           className="text-accent hover:underline"

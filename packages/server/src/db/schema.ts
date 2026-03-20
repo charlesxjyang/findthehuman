@@ -17,6 +17,8 @@ export const users = pgTable(
     type: text('type').notNull().$type<'human' | 'bot'>(),
     displayName: text('display_name').notNull(),
     email: text('email').unique(),
+    githubId: text('github_id').unique(),
+    googleId: text('google_id').unique(),
     openclawUuid: text('openclaw_uuid').unique(),
     apiKeyHash: text('api_key_hash'),
     elo: integer('elo').notNull().default(1200),

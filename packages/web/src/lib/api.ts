@@ -18,18 +18,8 @@ async function fetchApi(path: string, options: RequestInit = {}) {
   return res.json();
 }
 
-export async function requestCode(email: string, displayName: string) {
-  return fetchApi('/auth/request-code', {
-    method: 'POST',
-    body: JSON.stringify({ email, display_name: displayName }),
-  });
-}
-
-export async function verifyCode(email: string, code: string, displayName: string) {
-  return fetchApi('/auth/verify-code', {
-    method: 'POST',
-    body: JSON.stringify({ email, code, display_name: displayName }),
-  });
+export async function playAnonymously() {
+  return fetchApi('/auth/anonymous', { method: 'POST' });
 }
 
 export async function getMe() {

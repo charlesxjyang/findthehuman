@@ -1,78 +1,197 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/connection.js';
 import { users } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'node:crypto';
-import { getRedis } from '../redis.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || '';
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || '';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+
+function issueToken(userId: string): string {
+  return jwt.sign({ userId, type: 'human' }, JWT_SECRET, { expiresIn: '7d' });
+}
+
+function issueAnonToken(userId: string): string {
+  return jwt.sign({ userId, type: 'human' }, JWT_SECRET, { expiresIn: '24h' });
+}
+
+// Random display names for anonymous users
+const ADJECTIVES = ['Sneaky', 'Clever', 'Silent', 'Swift', 'Bold', 'Witty', 'Cosmic', 'Lucky', 'Mystic', 'Phantom'];
+const ANIMALS = ['Fox', 'Owl', 'Wolf', 'Lynx', 'Raven', 'Falcon', 'Panda', 'Otter', 'Tiger', 'Hawk'];
+
+function randomDisplayName(): string {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+  const num = Math.floor(Math.random() * 100);
+  return `${adj}${animal}${num}`;
+}
 
 export async function authRoutes(fastify: FastifyInstance) {
-  // Request a magic code (in production, this would send an email)
-  fastify.post('/auth/request-code', async (request, reply) => {
-    const { email, display_name } = request.body as {
-      email: string;
-      display_name: string;
-    };
-
-    if (!email || !display_name) {
-      return reply.code(400).send({ error: 'email and display_name are required' });
-    }
-
-    // Generate a 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Store code in Redis with 10-min TTL
-    const redis = getRedis();
-    await redis.set(`auth:code:${email}`, code, 'EX', 600);
-
-    // In development, log the code. In production, send via email.
-    fastify.log.info(`Magic code for ${email}: ${code}`);
-
-    return { message: 'Code sent', code: process.env.NODE_ENV !== 'production' ? code : undefined };
+  // --- GitHub OAuth ---
+  fastify.get('/auth/github', async (_request, reply) => {
+    const state = randomBytes(16).toString('hex');
+    const params = new URLSearchParams({
+      client_id: GITHUB_CLIENT_ID,
+      redirect_uri: `${getServerUrl()}/auth/github/callback`,
+      scope: 'read:user user:email',
+      state,
+    });
+    return reply.redirect(`https://github.com/login/oauth/authorize?${params}`);
   });
 
-  // Verify code and get JWT
-  fastify.post('/auth/verify-code', async (request, reply) => {
-    const { email, code, display_name } = request.body as {
-      email: string;
-      code: string;
-      display_name: string;
-    };
-
-    if (!email || !code) {
-      return reply.code(400).send({ error: 'email and code are required' });
+  fastify.get('/auth/github/callback', async (request, reply) => {
+    const { code } = request.query as { code?: string };
+    if (!code) {
+      return reply.redirect(`${FRONTEND_URL}/auth/callback?error=missing_code`);
     }
 
-    const redis = getRedis();
-    const storedCode = await redis.get(`auth:code:${email}`);
+    try {
+      // Exchange code for token
+      const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          client_id: GITHUB_CLIENT_ID,
+          client_secret: GITHUB_CLIENT_SECRET,
+          code,
+        }),
+      });
+      const tokenData = await tokenRes.json() as { access_token?: string; error?: string };
+      if (!tokenData.access_token) {
+        return reply.redirect(`${FRONTEND_URL}/auth/callback?error=token_exchange_failed`);
+      }
 
-    if (!storedCode || storedCode !== code) {
-      return reply.code(401).send({ error: 'Invalid or expired code' });
+      // Fetch user profile
+      const userRes = await fetch('https://api.github.com/user', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      const ghUser = await userRes.json() as { id: number; login: string; email?: string };
+
+      const githubId = String(ghUser.id);
+
+      // Find or create user
+      let [user] = await db.select().from(users).where(eq(users.githubId, githubId));
+
+      if (!user && ghUser.email) {
+        // Try to link by email (existing magic-code user migrating to OAuth)
+        [user] = await db.select().from(users).where(eq(users.email, ghUser.email));
+        if (user) {
+          await db.update(users).set({ githubId }).where(eq(users.id, user.id));
+        }
+      }
+
+      if (!user) {
+        [user] = await db
+          .insert(users)
+          .values({
+            type: 'human',
+            displayName: ghUser.login,
+            email: ghUser.email || null,
+            githubId,
+          })
+          .returning();
+      }
+
+      const token = issueToken(user.id);
+      return reply.redirect(`${FRONTEND_URL}/auth/callback?token=${token}`);
+    } catch (err) {
+      fastify.log.error(err, 'GitHub OAuth error');
+      return reply.redirect(`${FRONTEND_URL}/auth/callback?error=oauth_failed`);
     }
+  });
 
-    // Delete used code
-    await redis.del(`auth:code:${email}`);
-
-    // Find or create user
-    let [user] = await db.select().from(users).where(eq(users.email, email));
-
-    if (!user) {
-      [user] = await db
-        .insert(users)
-        .values({
-          type: 'human',
-          displayName: display_name || email.split('@')[0],
-          email,
-        })
-        .returning();
-    }
-
-    const token = jwt.sign({ userId: user.id, type: 'human' }, JWT_SECRET, {
-      expiresIn: '7d',
+  // --- Google OAuth ---
+  fastify.get('/auth/google', async (_request, reply) => {
+    const state = randomBytes(16).toString('hex');
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: `${getServerUrl()}/auth/google/callback`,
+      response_type: 'code',
+      scope: 'openid email profile',
+      state,
     });
+    return reply.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+  });
 
+  fastify.get('/auth/google/callback', async (request, reply) => {
+    const { code } = request.query as { code?: string };
+    if (!code) {
+      return reply.redirect(`${FRONTEND_URL}/auth/callback?error=missing_code`);
+    }
+
+    try {
+      // Exchange code for token
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: `${getServerUrl()}/auth/google/callback`,
+          grant_type: 'authorization_code',
+        }),
+      });
+      const tokenData = await tokenRes.json() as { access_token?: string };
+      if (!tokenData.access_token) {
+        return reply.redirect(`${FRONTEND_URL}/auth/callback?error=token_exchange_failed`);
+      }
+
+      // Fetch user info
+      const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      const gUser = await userRes.json() as { sub: string; name?: string; email?: string };
+
+      const googleId = gUser.sub;
+
+      // Find or create user
+      let [user] = await db.select().from(users).where(eq(users.googleId, googleId));
+
+      if (!user && gUser.email) {
+        [user] = await db.select().from(users).where(eq(users.email, gUser.email));
+        if (user) {
+          await db.update(users).set({ googleId }).where(eq(users.id, user.id));
+        }
+      }
+
+      if (!user) {
+        [user] = await db
+          .insert(users)
+          .values({
+            type: 'human',
+            displayName: gUser.name || gUser.email?.split('@')[0] || 'Player',
+            email: gUser.email || null,
+            googleId,
+          })
+          .returning();
+      }
+
+      const token = issueToken(user.id);
+      return reply.redirect(`${FRONTEND_URL}/auth/callback?token=${token}`);
+    } catch (err) {
+      fastify.log.error(err, 'Google OAuth error');
+      return reply.redirect(`${FRONTEND_URL}/auth/callback?error=oauth_failed`);
+    }
+  });
+
+  // --- Anonymous play ---
+  fastify.post('/auth/anonymous', async () => {
+    const [user] = await db
+      .insert(users)
+      .values({
+        type: 'human',
+        displayName: randomDisplayName(),
+      })
+      .returning();
+
+    const token = issueAnonToken(user.id);
     return {
       token,
       user: {
@@ -84,7 +203,7 @@ export async function authRoutes(fastify: FastifyInstance) {
     };
   });
 
-  // Get current user from token
+  // --- Get current user from token ---
   fastify.get('/auth/me', async (request, reply) => {
     const auth = request.headers.authorization;
     if (!auth?.startsWith('Bearer ')) {
@@ -109,4 +228,12 @@ export async function authRoutes(fastify: FastifyInstance) {
       return reply.code(401).send({ error: 'Invalid token' });
     }
   });
+}
+
+function getServerUrl(): string {
+  // Railway provides RAILWAY_PUBLIC_DOMAIN
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  }
+  return `http://localhost:${process.env.PORT || 3001}`;
 }

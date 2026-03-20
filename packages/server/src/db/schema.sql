@@ -7,6 +7,8 @@ CREATE TABLE users (
   type TEXT NOT NULL CHECK (type IN ('human', 'bot')),
   display_name TEXT NOT NULL,
   email TEXT UNIQUE,
+  github_id TEXT UNIQUE,
+  google_id TEXT UNIQUE,
   openclaw_uuid TEXT UNIQUE,
   api_key_hash TEXT,
   elo INTEGER NOT NULL DEFAULT 1200,
