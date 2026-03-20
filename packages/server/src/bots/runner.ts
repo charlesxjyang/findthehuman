@@ -55,7 +55,10 @@ async function botLoop(bot: BotState): Promise<void> {
   const { personality, apiKey } = bot;
   const tag = `[${personality.name}]`;
 
-  console.log(`${tag} Starting poll loop`);
+  // Each bot gets a random base delay to stagger responses
+  const baseDelay = Math.floor(Math.random() * 8000) + 3000; // 3-11s offset
+  console.log(`${tag} Starting poll loop (base delay ${baseDelay}ms)`);
+
   while (true) {
     try {
       if (!bot.currentRoom) {
@@ -97,11 +100,12 @@ async function botLoop(bot: BotState): Promise<void> {
         continue;
       }
 
-      // During discussion: post messages
+      // During discussion: post messages with randomized timing
       const now = Date.now();
+      const cooldown = baseDelay + Math.floor(Math.random() * 10000); // 3-21s between messages
       if (
         bot.messagesSent < 5 &&
-        now - bot.lastMessageTime > 15000 // At least 15s between messages
+        now - bot.lastMessageTime > cooldown
       ) {
         try {
           const chatHistory = (messages as any[]).map((m: any) => ({
@@ -140,13 +144,13 @@ async function botLoop(bot: BotState): Promise<void> {
         }
       }
 
-      await sleep(10000);
+      await sleep(3000 + Math.floor(Math.random() * 4000)); // 3-7s poll interval
     } catch (err: any) {
       if (err.message?.includes('Not in discussion') || err.message?.includes('voting')) {
         await tryVote(bot, []);
       }
       console.error(`${tag} Error:`, err.message || err);
-      await sleep(10000);
+      await sleep(3000);
     }
   }
 }
