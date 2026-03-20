@@ -106,7 +106,7 @@ async function botLoop(bot: BotState): Promise<void> {
       const now = Date.now();
       const cooldown = 4000 + Math.floor(Math.random() * 5000); // 4-9s between messages
       if (
-        bot.messagesSent < 15 &&
+        bot.messagesSent < 20 &&
         now - bot.lastMessageTime > cooldown
       ) {
         try {

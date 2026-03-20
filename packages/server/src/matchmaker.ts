@@ -84,7 +84,7 @@ async function startGame(roomId: string, io?: any): Promise<void> {
 
   await assignHandles(roomId);
   await advancePhase(roomId); // → topic_reveal
-  await schedulePhaseTransition(roomId, 10_000, 'topic_reveal'); // after 10s → discussion
+  await schedulePhaseTransition(roomId, 8_000, 'topic_reveal'); // after 8s → discussion
 
   // Notify WebSocket clients
   if (io) {
@@ -190,6 +190,18 @@ async function processGameResults(roomId: string, io: Server): Promise<void> {
 
   const votes = await getVotes(roomId);
   // If no bots voted (e.g. solo testing), skip scoring but still record the game
+  // Look up display names for all participants
+  const participantUsers = await Promise.all(
+    room.participants.map(async (pid) => {
+      const [u] = await db.select().from(users).where(eq(users.id, pid));
+      return u;
+    }),
+  );
+  const displayNameMap: Record<string, string> = {};
+  for (const u of participantUsers) {
+    if (u) displayNameMap[u.id] = u.displayName;
+  }
+
   if (votes.size === 0) {
     await db.insert(games).values({
       topic: room.topic,
@@ -202,6 +214,7 @@ async function processGameResults(roomId: string, io: Server): Promise<void> {
     io.of('/game').to(`room:${roomId}`).emit('room:reveal', {
       results: room.participants.map((pid) => ({
         handle: room.handleMap[pid],
+        displayName: displayNameMap[pid] || 'Unknown',
         type: pid === room.humanId ? 'human' : 'bot',
         userId: pid,
         eloChange: 0,
@@ -273,6 +286,7 @@ async function processGameResults(roomId: string, io: Server): Promise<void> {
   // Bot participants
   const revealResults: Array<{
     handle: string;
+    displayName: string;
     type: string;
     userId: string;
     eloChange: number;
@@ -281,6 +295,7 @@ async function processGameResults(roomId: string, io: Server): Promise<void> {
 
   revealResults.push({
     handle: room.handleMap[room.humanId],
+    displayName: displayNameMap[room.humanId] || 'Unknown',
     type: 'human',
     userId: room.humanId,
     eloChange: newHumanElo - humanUser.elo,
@@ -314,6 +329,7 @@ async function processGameResults(roomId: string, io: Server): Promise<void> {
 
     revealResults.push({
       handle: room.handleMap[result.botUserId],
+      displayName: displayNameMap[result.botUserId] || botUser.displayName,
       type: 'bot',
       userId: result.botUserId,
       eloChange: newBotElo - botUser.elo,

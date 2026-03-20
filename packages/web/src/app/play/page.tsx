@@ -16,6 +16,7 @@ interface Participant {
 
 interface RevealResult {
   handle: string;
+  displayName?: string;
   type: 'human' | 'bot';
   eloChange: number;
   detectionScore: number | null;
@@ -197,7 +198,7 @@ export default function PlayPage() {
       : timerEnd && phase === 'voting'
         ? Math.max(0, timeLeft / 25000) * 100
         : timerEnd && phase === 'topic_reveal'
-          ? Math.max(0, timeLeft / 10000) * 100
+          ? Math.max(0, timeLeft / 8000) * 100
           : 100;
 
   const timerDisplay = `${Math.floor(timeLeft / 60000)}:${String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}`;
@@ -305,8 +306,11 @@ export default function PlayPage() {
                   r.type === 'human' ? 'bg-primary/20 border border-primary/40' : 'bg-surface'
                 }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <span className={`font-semibold ${getHandleColor(r.handle)}`}>{r.handle}</span>
+                  {r.displayName && (
+                    <span className="text-xs text-gray-500">({r.displayName})</span>
+                  )}
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full ${
                       r.type === 'human'
