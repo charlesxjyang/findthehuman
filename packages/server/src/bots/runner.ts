@@ -1,10 +1,14 @@
 import 'dotenv/config';
 import { PERSONALITIES, type BotPersonality, type LLMProvider } from './personalities.js';
 import * as gemini from './gemini.js';
-import * as groq from './groq.js';
+import { llama, qwen } from './groq.js';
 
 function getLLM(provider: LLMProvider) {
-  return provider === 'groq' ? groq : gemini;
+  switch (provider) {
+    case 'groq': return llama;
+    case 'groq-qwen': return qwen;
+    case 'gemini': return gemini;
+  }
 }
 
 const API_BASE = process.env.BOT_API_BASE || 'http://localhost:3001';
