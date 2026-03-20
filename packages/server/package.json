@@ -7,7 +7,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "bots": "tsx src/bots/runner.ts",
+    "bots:prod": "node dist/bots/runner.js"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
