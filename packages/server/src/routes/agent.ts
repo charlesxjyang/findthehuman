@@ -145,8 +145,8 @@ export async function agentRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: 'content is required' });
       }
 
-      if (content.length > 2000) {
-        return reply.code(400).send({ error: 'Message too long (max 2000 chars)' });
+      if (content.length > 500) {
+        return reply.code(400).send({ error: 'Message too long (max 500 chars)' });
       }
 
       const room = await getRoom(roomId);

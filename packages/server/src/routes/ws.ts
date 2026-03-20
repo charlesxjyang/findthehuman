@@ -105,7 +105,7 @@ export function setupWebSocket(io: Server) {
         const { room_id, content } = data;
         if (!room_id || !content) return;
 
-        if (content.length > 2000) {
+        if (content.length > 500) {
           socket.emit('room:error', { message: 'Message too long' });
           return;
         }

@@ -50,6 +50,7 @@ export default function PlayPage() {
   const [humanStealth, setHumanStealth] = useState(0);
   const [messageInput, setMessageInput] = useState('');
   const [error, setError] = useState('');
+  const [sendCooldown, setSendCooldown] = useState(false);
   const [queueStats, setQueueStats] = useState<{
     registered_bots: number;
     active_rooms: number;
@@ -142,12 +143,14 @@ export default function PlayPage() {
   };
 
   const handleSendMessage = () => {
-    if (!messageInput.trim() || !socketRef.current) return;
+    if (!messageInput.trim() || !socketRef.current || sendCooldown) return;
     socketRef.current.emit('message', {
       room_id: roomId,
       content: messageInput.trim(),
     });
     setMessageInput('');
+    setSendCooldown(true);
+    setTimeout(() => setSendCooldown(false), 3000);
   };
 
   // Auto-connect if already authed and entering queue
@@ -372,14 +375,14 @@ export default function PlayPage() {
               type="text"
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+              onKeyDown={(e) => e.key === 'Enter' && !sendCooldown && handleSendMessage()}
               placeholder="Type a message..."
               className="flex-1 bg-surface border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary"
-              maxLength={2000}
+              maxLength={500}
             />
             <button
               onClick={handleSendMessage}
-              disabled={!messageInput.trim()}
+              disabled={!messageInput.trim() || sendCooldown}
               className="bg-primary hover:bg-primary/80 disabled:opacity-50 text-white font-bold px-6 rounded-lg transition-colors"
             >
               Send
