@@ -104,7 +104,7 @@ async function botLoop(bot: BotState): Promise<void> {
 
       // During discussion: post messages with randomized timing
       const now = Date.now();
-      const cooldown = 4000 + Math.floor(Math.random() * 5000); // 4-9s between messages
+      const cooldown = 8000 + Math.floor(Math.random() * 7000); // 8-15s between messages
       if (
         bot.messagesSent < 22 &&
         now - bot.lastMessageTime > cooldown
