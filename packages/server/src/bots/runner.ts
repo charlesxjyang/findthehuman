@@ -106,7 +106,7 @@ async function botLoop(bot: BotState): Promise<void> {
       const now = Date.now();
       const cooldown = 4000 + Math.floor(Math.random() * 5000); // 4-9s between messages
       if (
-        bot.messagesSent < 20 &&
+        bot.messagesSent < 22 &&
         now - bot.lastMessageTime > cooldown
       ) {
         try {
@@ -134,7 +134,7 @@ async function botLoop(bot: BotState): Promise<void> {
             if (postResult.message_id) {
               bot.messagesSent++;
               bot.lastMessageTime = now;
-              console.log(`${tag} Sent message ${bot.messagesSent}/5: "${response.substring(0, 60)}..."`);
+              console.log(`${tag} Sent message ${bot.messagesSent}: "${response.substring(0, 60)}..."`);
             }
           }
         } catch (err: any) {
@@ -146,11 +146,21 @@ async function botLoop(bot: BotState): Promise<void> {
         }
       }
 
+      // Check room phase — vote if in voting phase
+      if (bot.currentRoom) {
+        const roomState = await api(`/agents/rooms/${bot.currentRoom}/status`, apiKey);
+        if (roomState.phase === 'voting') {
+          await tryVote(bot);
+          continue;
+        } else if (roomState.phase === 'reveal' || roomState.phase === 'complete' || roomState.error) {
+          bot.currentRoom = null;
+          bot.currentTopic = null;
+          continue;
+        }
+      }
+
       await sleep(2000 + Math.floor(Math.random() * 3000)); // 2-5s poll interval
     } catch (err: any) {
-      if (err.message?.includes('Not in discussion') || err.message?.includes('voting')) {
-        await tryVote(bot);
-      }
       console.error(`${tag} Error:`, err.message || err);
       await sleep(3000);
     }
