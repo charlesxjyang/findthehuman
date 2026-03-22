@@ -21,6 +21,7 @@ interface BotState {
   currentTopic: string | null;
   messagesSent: number;
   lastMessageTime: number;
+  roomJoinedAt: number;
 }
 
 function headers(apiKey: string): Record<string, string> {
@@ -73,6 +74,7 @@ async function botLoop(bot: BotState): Promise<void> {
             bot.currentRoom = room.room_id;
             bot.currentTopic = joinResult.topic || room.topic;
             bot.messagesSent = 0;
+            bot.roomJoinedAt = Date.now();
             console.log(`${tag} Joined room ${room.room_id} — topic: "${bot.currentTopic}"`);
           } else {
             console.log(`${tag} Failed to join: ${joinResult.error || 'unknown'}`);
@@ -84,25 +86,51 @@ async function botLoop(bot: BotState): Promise<void> {
         continue;
       }
 
-      // We're in a room — fetch messages and participate
+      // We're in a room — check phase first
+      const roomState = await api(`/agents/rooms/${bot.currentRoom}/status`, apiKey);
+
+      if (roomState.error || roomState.phase === 'reveal' || roomState.phase === 'complete') {
+        console.log(`${tag} Room ended (phase: ${roomState.phase || 'error'})`);
+        bot.currentRoom = null;
+        bot.currentTopic = null;
+        continue;
+      }
+
+      if (roomState.phase === 'lobby') {
+        // Still waiting for game to start — bail after 35s to avoid getting trapped
+        if (Date.now() - bot.roomJoinedAt > 35_000) {
+          console.log(`${tag} Room ${bot.currentRoom} stuck in lobby, leaving`);
+          bot.currentRoom = null;
+          bot.currentTopic = null;
+          continue;
+        }
+        await sleep(2000);
+        continue;
+      }
+
+      if (roomState.phase === 'voting') {
+        await tryVote(bot);
+        continue;
+      }
+
+      if (roomState.phase === 'topic_reveal') {
+        await sleep(2000);
+        continue;
+      }
+
+      // discussion phase — fetch messages and participate
       const messages = await api(
         `/agents/rooms/${bot.currentRoom}/messages`,
         apiKey,
       );
 
       if (messages.error) {
-        // Check if room moved to voting phase — try to vote
-        if (messages.error.includes('not in discussion') || messages.error.includes('Not in discussion')) {
-          await tryVote(bot);
-          continue;
-        }
-        console.log(`${tag} Room ended or error: ${messages.error}`);
+        console.log(`${tag} Messages error: ${messages.error}`);
         bot.currentRoom = null;
         bot.currentTopic = null;
         continue;
       }
 
-      // During discussion: post messages with randomized timing
       const now = Date.now();
       const cooldown = 8000 + Math.floor(Math.random() * 7000); // 8-15s between messages
       if (
@@ -116,9 +144,10 @@ async function botLoop(bot: BotState): Promise<void> {
           }));
 
           const topic = bot.currentTopic || 'a general topic';
+          const recentMsgs = chatHistory.slice(-8).map((m: any) => m.content).join('\n');
           const topicContext = chatHistory.length > 0
-            ? `The topic is: "${topic}"\n\nRecent messages:\n${chatHistory.slice(-10).map((m: any) => m.content).join('\n')}\n\nContribute to the conversation naturally. Stay on topic.`
-            : `The topic is: "${topic}"\n\nThe discussion has just started. Share your initial thoughts.`;
+            ? `You're in a group chat discussing: "${topic}"\n\nRecent messages:\n${recentMsgs}\n\nREPLY to the most recent message or react to what someone specific said. Use their name. Agree, disagree, ask them a question, or build on their point. Do NOT just state your own opinion in isolation. Be conversational like a real group chat.`
+            : `You just joined a group chat. The topic is: "${topic}"\n\nYou're the first to speak. Share a brief opening thought or question to kick off the conversation.`;
 
           const llm = getLLM(personality.provider);
           const response = await llm.chatCompletion(personality.chatStyle, [
@@ -139,23 +168,9 @@ async function botLoop(bot: BotState): Promise<void> {
           }
         } catch (err: any) {
           console.error(`${tag} Chat error:`, err.message || err);
-          // If room moved to voting, try voting
           if (err.message?.includes('not in discussion') || err.message?.includes('voting')) {
             await tryVote(bot);
           }
-        }
-      }
-
-      // Check room phase — vote if in voting phase
-      if (bot.currentRoom) {
-        const roomState = await api(`/agents/rooms/${bot.currentRoom}/status`, apiKey);
-        if (roomState.phase === 'voting') {
-          await tryVote(bot);
-          continue;
-        } else if (roomState.phase === 'reveal' || roomState.phase === 'complete' || roomState.error) {
-          bot.currentRoom = null;
-          bot.currentTopic = null;
-          continue;
         }
       }
 
@@ -241,6 +256,7 @@ async function main() {
       currentTopic: null,
       messagesSent: 0,
       lastMessageTime: 0,
+      roomJoinedAt: 0,
     });
   }
 
