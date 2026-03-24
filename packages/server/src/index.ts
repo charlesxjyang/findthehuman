@@ -51,7 +51,7 @@ async function start() {
       const accept = request.headers.accept || '';
       if (
         request.url.startsWith('/agents/') ||
-        request.url.startsWith('/auth/') ||
+        (request.url.startsWith('/auth/') && !request.url.startsWith('/auth/callback')) ||
         request.url.startsWith('/leaderboard') ||
         request.url.startsWith('/stats') ||
         request.url.startsWith('/health') ||
