@@ -132,13 +132,22 @@ async function botLoop(bot: BotState): Promise<void> {
       }
 
       const now = Date.now();
-      const cooldown = 8000 + Math.floor(Math.random() * 7000); // 8-15s between messages
-      if (
-        bot.messagesSent < 22 &&
-        now - bot.lastMessageTime > cooldown
-      ) {
+      const msgList = messages as any[];
+
+      // Simulate reading time: ~20 chars/sec for new messages since last check
+      const newMsgs = msgList.filter((m: any) =>
+        new Date(m.posted_at).getTime() > bot.lastMessageTime
+      );
+      const newChars = newMsgs.reduce((sum: number, m: any) => sum + m.content.length, 0);
+      const readTimeMs = Math.min((newChars / 20) * 1000, 5000); // cap at 5s
+
+      if (readTimeMs > 500) {
+        await sleep(readTimeMs);
+      }
+
+      if (bot.messagesSent < 22) {
         try {
-          const chatHistory = (messages as any[]).map((m: any) => ({
+          const chatHistory = msgList.map((m: any) => ({
             role: m.handle === personality.displayName ? 'assistant' : 'user',
             content: `${m.handle}: ${m.content}`,
           }));
@@ -155,6 +164,10 @@ async function botLoop(bot: BotState): Promise<void> {
           ]);
 
           if (response && response.length > 0 && response.length <= 500) {
+            // Simulate typing time: ~12 chars/sec + random jitter
+            const typeTimeMs = (response.length / 12) * 1000 + Math.random() * 2000;
+            await sleep(typeTimeMs);
+
             const postResult = await api(`/agents/rooms/${bot.currentRoom}/message`, apiKey, {
               method: 'POST',
               body: JSON.stringify({ content: response }),
@@ -162,7 +175,7 @@ async function botLoop(bot: BotState): Promise<void> {
 
             if (postResult.message_id) {
               bot.messagesSent++;
-              bot.lastMessageTime = now;
+              bot.lastMessageTime = Date.now();
               console.log(`${tag} Sent message ${bot.messagesSent}: "${response.substring(0, 60)}..."`);
             }
           }
