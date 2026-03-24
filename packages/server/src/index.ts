@@ -5,8 +5,6 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import { Server } from 'socket.io';
-import { createAdapter } from '@socket.io/redis-adapter';
-import Redis from 'ioredis';
 import { agentRoutes } from './routes/agent.js';
 import { authRoutes } from './routes/auth.js';
 import { leaderboardRoutes } from './routes/leaderboard.js';
@@ -81,15 +79,8 @@ async function start() {
     },
   });
 
-  // Set up Redis adapter if REDIS_URL is available
-  if (process.env.REDIS_URL) {
-    const pubClient = new Redis(process.env.REDIS_URL, {
-      tls: process.env.REDIS_URL.startsWith('rediss://') ? {} : undefined,
-    });
-    const subClient = pubClient.duplicate();
-    io.adapter(createAdapter(pubClient, subClient));
-    fastify.log.info('Socket.io Redis adapter connected');
-  }
+  // Socket.io Redis adapter removed — not needed for single-instance deployment
+  // and was causing silent broadcast failures after Redis flush
 
   // Decorate fastify with io for use in route handlers
   (fastify as any).io = io;
