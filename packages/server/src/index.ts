@@ -97,11 +97,9 @@ async function start() {
   // Set up WebSocket handlers
   setupWebSocket(io);
 
-  // Start BullMQ phase worker
-  if (process.env.REDIS_URL) {
-    startPhaseWorker(io);
-    fastify.log.info('Phase transition worker started');
-  }
+  // Initialize phase transition system
+  startPhaseWorker(io);
+  fastify.log.info('Phase transition system started');
 
   // Create Moltbook submolt (best-effort)
   if (process.env.MOLTBOOK_API_KEY) {

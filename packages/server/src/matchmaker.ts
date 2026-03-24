@@ -1,5 +1,3 @@
-import { Queue, Worker, type ConnectionOptions } from 'bullmq';
-import Redis from 'ioredis';
 import { createRoom, joinRoom, assignHandles, advancePhase, getRoom, getVotes, cleanupRoom } from './rooms.js';
 import { computeScores, updateElo } from './scoring.js';
 import { db } from './db/connection.js';
@@ -8,40 +6,94 @@ import { eq } from 'drizzle-orm';
 import type { Server } from 'socket.io';
 import { postGameResult } from './moltbook.js';
 
-function createBullMQConnection(): ConnectionOptions {
-  const url = process.env.REDIS_URL!;
-  return new Redis(url, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-    tls: url.startsWith('rediss://') ? {} : undefined,
-  }) as unknown as ConnectionOptions;
-}
-
 const ROOM_SIZE = 5;
 const BOT_COUNT = 4;
 
-let phaseQueue: Queue | null = null;
-let phaseWorker: Worker | null = null;
+// In-memory timers replace BullMQ — simpler, no Redis dependency
+const activeTimers = new Map<string, NodeJS.Timeout>();
 
-export function getPhaseQueue(): Queue {
-  if (!phaseQueue) {
-    phaseQueue = new Queue('phase-transitions', {
-      connection: createBullMQConnection(),
-    });
+function clearRoomTimer(key: string): void {
+  const timer = activeTimers.get(key);
+  if (timer) {
+    clearTimeout(timer);
+    activeTimers.delete(key);
   }
-  return phaseQueue;
 }
 
 /**
  * Schedule the next phase transition for a room.
  */
-export async function schedulePhaseTransition(roomId: string, delayMs: number, expectedPhase?: string): Promise<void> {
-  const queue = getPhaseQueue();
-  await queue.add(
-    'advance',
-    { roomId, expectedPhase },
-    { delay: delayMs, removeOnComplete: true, removeOnFail: 100 },
-  );
+function schedulePhaseTransition(roomId: string, delayMs: number, expectedPhase: string, io: Server): void {
+  const key = `${roomId}:${expectedPhase}`;
+  clearRoomTimer(key);
+
+  const timer = setTimeout(async () => {
+    activeTimers.delete(key);
+    try {
+      await handlePhaseTransition(roomId, expectedPhase, io);
+    } catch (err) {
+      console.error(`Phase transition failed for room ${roomId}:`, err);
+    }
+  }, delayMs);
+
+  activeTimers.set(key, timer);
+}
+
+async function handlePhaseTransition(roomId: string, expectedPhase: string, io: Server): Promise<void> {
+  const room = await getRoom(roomId);
+  if (!room) return;
+
+  // Skip if the room has already moved past the expected phase
+  if (room.phase !== expectedPhase) return;
+
+  // If still in lobby, check if we have enough players
+  if (room.phase === 'lobby') {
+    if (room.participants.length >= ROOM_SIZE) {
+      await startGame(roomId, io);
+    } else {
+      io.of('/game').to(`room:${roomId}`).emit('room:error', {
+        message: 'Not enough bots joined in time. Please try again.',
+      });
+      await cleanupRoom(roomId);
+    }
+    return;
+  }
+
+  const newPhase = await advancePhase(roomId);
+  const updatedRoom = await getRoom(roomId);
+
+  // Notify all connected clients in the room
+  io.of('/game').to(`room:${roomId}`).emit('room:phase', {
+    phase: newPhase,
+    timerEnd: updatedRoom?.timerEnd,
+    topic: newPhase === 'discussion' ? updatedRoom?.topic : undefined,
+  });
+
+  // Schedule next transition
+  switch (newPhase) {
+    case 'discussion':
+      schedulePhaseTransition(roomId, 3 * 60_000, 'discussion', io); // 3 min
+      break;
+    case 'voting':
+      schedulePhaseTransition(roomId, 25_000, 'voting', io); // 25 sec
+      break;
+    case 'reveal':
+      await processGameResults(roomId, io);
+      schedulePhaseTransition(roomId, 30_000, 'reveal', io);
+      break;
+    case 'complete':
+      break;
+  }
+}
+
+// Store io reference for use by matchHuman/checkAndStartRoom
+let ioRef: Server | null = null;
+
+/**
+ * Initialize the phase transition system (replaces BullMQ worker).
+ */
+export function startPhaseWorker(io: Server): void {
+  ioRef = io;
 }
 
 /**
@@ -52,7 +104,9 @@ export async function matchHuman(humanId: string): Promise<string | null> {
   const roomId = await createRoom(humanId);
 
   // Schedule a "start anyway" timer — if not enough bots join in 30s, timeout
-  await schedulePhaseTransition(roomId, 30_000, 'lobby');
+  if (ioRef) {
+    schedulePhaseTransition(roomId, 30_000, 'lobby', ioRef);
+  }
 
   return roomId;
 }
@@ -66,7 +120,6 @@ export async function checkAndStartRoom(roomId: string, io?: any): Promise<void>
 
   const participantCount = room.participants.length;
 
-  // Start when we have 6 participants (human + 5 bots)
   if (participantCount >= ROOM_SIZE) {
     await startGame(roomId, io);
   }
@@ -77,17 +130,20 @@ async function startGame(roomId: string, io?: any): Promise<void> {
   const { getRedis } = await import('./redis.js');
   const redis = getRedis();
   const locked = await redis.set(`room:${roomId}:starting`, '1', 'EX', 10, 'NX');
-  if (!locked) return; // Another call is already starting this room
+  if (!locked) return;
 
   const room = await getRoom(roomId);
   if (!room || room.phase !== 'lobby') return;
 
+  // Clear the lobby timeout
+  clearRoomTimer(`${roomId}:lobby`);
+
   await assignHandles(roomId);
   await advancePhase(roomId); // → topic_reveal
-  await schedulePhaseTransition(roomId, 8_000, 'topic_reveal'); // after 8s → discussion
 
-  // Notify WebSocket clients
   if (io) {
+    schedulePhaseTransition(roomId, 8_000, 'topic_reveal', io); // after 8s → discussion
+
     const updatedRoom = await getRoom(roomId);
     if (!updatedRoom) return;
 
@@ -115,73 +171,6 @@ async function startGame(roomId: string, io?: any): Promise<void> {
 }
 
 /**
- * Start the BullMQ worker that processes phase transitions.
- */
-export function startPhaseWorker(io: Server): void {
-  phaseWorker = new Worker(
-    'phase-transitions',
-    async (job) => {
-      const { roomId, expectedPhase } = job.data;
-      const room = await getRoom(roomId);
-      if (!room) return;
-
-      // Skip if the room has already moved past the expected phase
-      if (expectedPhase && room.phase !== expectedPhase) {
-        return;
-      }
-
-      // If still in lobby, check if we have enough players
-      if (room.phase === 'lobby') {
-        if (room.participants.length >= ROOM_SIZE) {
-          await startGame(roomId, io);
-        } else {
-          io.of('/game').to(`room:${roomId}`).emit('room:error', {
-            message: 'Not enough bots joined in time. Please try again.',
-          });
-          await cleanupRoom(roomId);
-        }
-        return;
-      }
-
-      const newPhase = await advancePhase(roomId);
-      const updatedRoom = await getRoom(roomId);
-
-      // Notify all connected clients in the room (on /game namespace)
-      io.of('/game').to(`room:${roomId}`).emit('room:phase', {
-        phase: newPhase,
-        timerEnd: updatedRoom?.timerEnd,
-        topic: newPhase === 'discussion' ? updatedRoom?.topic : undefined,
-      });
-
-      // Schedule next transition
-      switch (newPhase) {
-        case 'discussion':
-          await schedulePhaseTransition(roomId, 3 * 60_000, 'discussion'); // 3 min
-          break;
-        case 'voting':
-          await schedulePhaseTransition(roomId, 25_000, 'voting'); // 25 sec
-          break;
-        case 'reveal':
-          // Process scores and write to DB
-          await processGameResults(roomId, io);
-          // Auto-advance to complete after 30 seconds
-          await schedulePhaseTransition(roomId, 30_000, 'reveal');
-          break;
-        case 'complete':
-          // Cleanup Redis state after a delay
-          // Room data is persisted in Postgres
-          break;
-      }
-    },
-    { connection: createBullMQConnection() },
-  );
-
-  phaseWorker.on('failed', (job, err) => {
-    console.error(`Phase transition job ${job?.id} failed:`, err);
-  });
-}
-
-/**
  * Process game results: compute scores, update Elo, persist to Postgres.
  */
 async function processGameResults(roomId: string, io: Server): Promise<void> {
@@ -189,7 +178,6 @@ async function processGameResults(roomId: string, io: Server): Promise<void> {
   if (!room || !room.humanId) return;
 
   const votes = await getVotes(roomId);
-  // If no bots voted (e.g. solo testing), skip scoring but still record the game
   // Look up display names for all participants
   const participantUsers = await Promise.all(
     room.participants.map(async (pid) => {

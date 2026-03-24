@@ -8,7 +8,7 @@ export function getRedis(): Redis {
       throw new Error('REDIS_URL environment variable is required');
     }
     redis = new Redis(process.env.REDIS_URL, {
-      maxRetriesPerRequest: null, // Required for BullMQ
+      maxRetriesPerRequest: null,
       enableReadyCheck: false,
       tls: process.env.REDIS_URL.startsWith('rediss://') ? {} : undefined,
     });
