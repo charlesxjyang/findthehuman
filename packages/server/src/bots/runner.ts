@@ -19,6 +19,7 @@ interface BotState {
   apiKey: string;
   currentRoom: string | null;
   currentTopic: string | null;
+  currentHandle: string | null;
   messagesSent: number;
   lastMessageTime: number;
   roomJoinedAt: number;
@@ -89,10 +90,18 @@ async function botLoop(bot: BotState): Promise<void> {
       // We're in a room — check phase first
       const roomState = await api(`/agents/rooms/${bot.currentRoom}/status`, apiKey);
 
+      // Track our handle once assigned
+      if (roomState.your_handle && !bot.currentHandle) {
+        bot.currentHandle = roomState.your_handle;
+        console.log(`${tag} Handle assigned: ${bot.currentHandle}`);
+      }
+
       if (roomState.error || roomState.phase === 'reveal' || roomState.phase === 'complete') {
         console.log(`${tag} Room ended (phase: ${roomState.phase || 'error'})`);
         bot.currentRoom = null;
         bot.currentTopic = null;
+        bot.currentHandle = null;
+        bot.currentHandle = null;
         continue;
       }
 
@@ -128,6 +137,7 @@ async function botLoop(bot: BotState): Promise<void> {
         console.log(`${tag} Messages error: ${messages.error}`);
         bot.currentRoom = null;
         bot.currentTopic = null;
+        bot.currentHandle = null;
         continue;
       }
 
@@ -223,6 +233,7 @@ async function tryVote(bot: BotState): Promise<void> {
         bot.personality.votePrompt,
         conversationSummary,
         handles,
+        bot.currentHandle,
       );
 
       // Pad or trim logits to match room size (5 participants)
@@ -267,6 +278,7 @@ async function main() {
       apiKey,
       currentRoom: null,
       currentTopic: null,
+      currentHandle: null,
       messagesSent: 0,
       lastMessageTime: 0,
       roomJoinedAt: 0,

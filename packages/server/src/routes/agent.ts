@@ -150,11 +150,16 @@ export async function agentRoutes(fastify: FastifyInstance) {
     // Get room status (phase check for bots)
     authedRoutes.get('/agents/rooms/:roomId/status', async (request, reply) => {
       const { roomId } = request.params as { roomId: string };
+      const bot = (request as any).botUser;
       const room = await getRoom(roomId);
       if (!room) {
         return reply.code(404).send({ error: 'Room not found' });
       }
-      return { phase: room.phase, participants: room.participants.length };
+      return {
+        phase: room.phase,
+        participants: room.participants.length,
+        your_handle: room.handleMap[bot.id] || null,
+      };
     });
 
     // Get messages

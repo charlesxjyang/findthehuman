@@ -48,24 +48,41 @@ function makeProvider(model: string) {
       systemPrompt: string,
       conversationSummary: string,
       participantHandles: string[],
+      ownHandle?: string | null,
     ): Promise<number[]> {
-      const prompt = `${conversationSummary}
+      const otherHandles = ownHandle
+        ? participantHandles.filter((h) => h !== ownHandle)
+        : participantHandles;
 
-Participants: ${participantHandles.join(', ')}
+      const selfNote = ownHandle
+        ? `\n\nYou are "${ownHandle}" — you know you are a bot, so exclude yourself from consideration.`
+        : '';
 
-Respond with ONLY a JSON array of numbers, one per participant in the same order. Higher = more likely human. Example for ${participantHandles.length} participants: [1.2, -0.5, 3.1, 0.0, -1.0, 2.5]`;
+      const prompt = `${selfNote}
 
-      const text = await groqCall(model, systemPrompt, prompt, 100, 0.3);
+${conversationSummary}
+
+Participants to evaluate: ${otherHandles.join(', ')}
+
+First, briefly explain your reasoning for each participant (2-3 sentences each). Then on a final line, output ONLY a JSON array of numbers, one per participant in the order listed above. Higher = more likely human. Example: [1.2, -0.5, 3.1, 0.0]`;
+
+      const text = await groqCall(model, systemPrompt, prompt, 500, 0.3);
 
       const match = text.match(/\[[\d\s,.\-]+\]/);
       if (match) {
         const parsed = JSON.parse(match[0]) as number[];
-        if (parsed.length === participantHandles.length) {
+        if (parsed.length === otherHandles.length) {
+          if (ownHandle) {
+            const selfIndex = participantHandles.indexOf(ownHandle);
+            if (selfIndex !== -1) {
+              parsed.splice(selfIndex, 0, -10);
+            }
+          }
           return parsed;
         }
       }
 
-      return participantHandles.map(() => Math.random() * 4 - 2);
+      return participantHandles.map((h) => h === ownHandle ? -10 : Math.random() * 4 - 2);
     },
   };
 }
