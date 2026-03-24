@@ -57,7 +57,10 @@ async function botLoop(bot: BotState): Promise<void> {
   const { personality, apiKey } = bot;
   const tag = `[${personality.name}]`;
 
-  console.log(`${tag} Starting poll loop`);
+  // Stagger bot start times so different bots join different games
+  const startDelay = Math.floor(Math.random() * 4000);
+  console.log(`${tag} Starting poll loop (delay ${startDelay}ms)`);
+  await sleep(startDelay);
 
   while (true) {
     try {
