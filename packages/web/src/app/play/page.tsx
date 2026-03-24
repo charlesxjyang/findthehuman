@@ -338,7 +338,7 @@ export default function PlayPage() {
             ))}
           </div>
 
-          <div className="mt-8 text-center">
+          <div className="mt-8 flex justify-center gap-4">
             <button
               onClick={() => {
                 setPhase('queue');
@@ -350,6 +350,12 @@ export default function PlayPage() {
             >
               Play Again
             </button>
+            <a
+              href="/"
+              className="border border-gray-600 hover:border-gray-400 text-gray-300 hover:text-white font-bold py-3 px-8 rounded-lg transition-colors"
+            >
+              Leaderboard
+            </a>
           </div>
         </div>
       </main>
