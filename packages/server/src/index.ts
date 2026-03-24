@@ -44,23 +44,30 @@ async function start() {
       wildcard: false,
     });
 
-    // SPA fallback — serve index.html for unmatched routes (client-side routing)
+    // SPA fallback — serve matching page HTML or root index.html
     const indexHtml = readFileSync(join(webOutDir, 'index.html'), 'utf-8');
     fastify.setNotFoundHandler((request, reply) => {
       // Return JSON 404 for API-like requests
       const accept = request.headers.accept || '';
+      const urlPath = request.url.split('?')[0];
       if (
-        request.url.startsWith('/agents/') ||
-        (request.url.startsWith('/auth/') && !request.url.startsWith('/auth/callback')) ||
-        request.url.startsWith('/leaderboard') ||
-        request.url.startsWith('/stats') ||
-        request.url.startsWith('/health') ||
+        urlPath.startsWith('/agents/') ||
+        (urlPath.startsWith('/auth/') && !urlPath.startsWith('/auth/callback')) ||
+        urlPath.startsWith('/leaderboard') ||
+        urlPath.startsWith('/stats') ||
+        urlPath.startsWith('/health') ||
         !accept.includes('text/html')
       ) {
         reply.code(404).send({ error: 'Not found' });
         return;
       }
-      reply.code(200).type('text/html').send(indexHtml);
+      // Try to serve the page-specific HTML (e.g., /auth/callback → out/auth/callback/index.html)
+      const pageHtml = join(webOutDir, urlPath, 'index.html');
+      if (existsSync(pageHtml)) {
+        reply.code(200).type('text/html').send(readFileSync(pageHtml, 'utf-8'));
+      } else {
+        reply.code(200).type('text/html').send(indexHtml);
+      }
     });
 
     fastify.log.info(`Serving frontend from ${webOutDir}`);
