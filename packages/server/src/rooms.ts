@@ -79,9 +79,6 @@ export async function createRoom(humanId: string): Promise<string> {
   await redis.expire(`room:${roomId}:messages`, ROOM_TTL);
   await redis.expire(`room:${roomId}:votes`, ROOM_TTL);
 
-  // Track in active rooms set (avoids expensive KEYS scan)
-  await redis.sadd('active_rooms', roomId);
-
   return roomId;
 }
 
@@ -245,22 +242,4 @@ export async function cleanupRoom(roomId: string): Promise<void> {
     `room:${roomId}:messages`,
     `room:${roomId}:votes`,
   );
-  await redis.srem('active_rooms', roomId);
-}
-
-export async function getActiveRoomIds(): Promise<string[]> {
-  const redis = getRedis();
-  const roomIds = await redis.smembers('active_rooms');
-
-  // Prune any stale IDs (rooms that expired via TTL)
-  const valid: string[] = [];
-  for (const roomId of roomIds) {
-    const exists = await redis.exists(`room:${roomId}`);
-    if (exists) {
-      valid.push(roomId);
-    } else {
-      await redis.srem('active_rooms', roomId);
-    }
-  }
-  return valid;
 }

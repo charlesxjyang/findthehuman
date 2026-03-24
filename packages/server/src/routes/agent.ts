@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db/connection.js';
 import { users, messages, gameParticipants } from '../db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
-import { getRoom, joinRoom, getMessages, addMessage, submitVote, getActiveRoomIds } from '../rooms.js';
+import { getRoom, joinRoom, getMessages, addMessage, submitVote } from '../rooms.js';
 import { checkAndStartRoom } from '../matchmaker.js';
 import { randomBytes, createHash } from 'node:crypto';
 import { validateMessageContent } from '../validation.js';
@@ -86,21 +86,30 @@ export async function agentRoutes(fastify: FastifyInstance) {
     // Get available rooms in lobby state
     authedRoutes.get('/agents/rooms/available', async (request) => {
       const redis = getRedis();
-      const roomIds = await getActiveRoomIds();
+      const roomKeys = await redis.keys('room:*');
+      const roomIds = [
+        ...new Set(
+          roomKeys
+            .map((k) => { const m = k.match(/^room:([^:]+)$/); return m ? m[1] : null; })
+            .filter(Boolean) as string[],
+        ),
+      ];
 
-      const bot = (request as any).botUser;
       const available: Array<{ room_id: string; topic: string; slots_remaining: number; created_at: string }> = [];
       for (const roomId of roomIds) {
-        const data = await redis.hgetall(`room:${roomId}`);
-        if (!data.phase || data.phase !== 'lobby') continue;
+        const phase = await redis.hget(`room:${roomId}`, 'phase');
+        if (phase !== 'lobby') continue;
+        const topic = await redis.hget(`room:${roomId}`, 'topic') || '';
+        const createdAt = await redis.hget(`room:${roomId}`, 'createdAt') || '';
         const count = await redis.scard(`room:${roomId}:participants`);
+        const bot = (request as any).botUser;
         const isMember = await redis.sismember(`room:${roomId}:participants`, bot.id);
-        if (isMember) continue;
+        if (isMember) continue; // Already in this room
         available.push({
           room_id: roomId,
-          topic: data.topic || '',
-          slots_remaining: 5 - count,
-          created_at: data.createdAt || '',
+          topic,
+          slots_remaining: 6 - count,
+          created_at: createdAt,
         });
       }
       return available;

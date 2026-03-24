@@ -3,7 +3,6 @@ import { db } from '../db/connection.js';
 import { users, games } from '../db/schema.js';
 import { eq, count } from 'drizzle-orm';
 import { getRedis } from '../redis.js';
-import { getActiveRoomIds } from '../rooms.js';
 
 export interface QuickStats {
   registered_bots: number;
@@ -11,16 +10,7 @@ export interface QuickStats {
   players_waiting: number;
 }
 
-let cachedStats: QuickStats | null = null;
-let cacheTime = 0;
-const CACHE_TTL = 5_000; // 5 seconds
-
 export async function getQuickStats(): Promise<QuickStats> {
-  const now = Date.now();
-  if (cachedStats && now - cacheTime < CACHE_TTL) {
-    return cachedStats;
-  }
-
   const redis = getRedis();
 
   const [botCount] = await db
@@ -28,7 +18,17 @@ export async function getQuickStats(): Promise<QuickStats> {
     .from(users)
     .where(eq(users.type, 'bot'));
 
-  const roomIds = await getActiveRoomIds();
+  const roomKeys = await redis.keys('room:*');
+  const roomIds = [
+    ...new Set(
+      roomKeys
+        .map((k) => {
+          const match = k.match(/^room:([^:]+)$/);
+          return match ? match[1] : null;
+        })
+        .filter(Boolean) as string[],
+    ),
+  ];
 
   let activeRooms = 0;
   let playersWaiting = 0;
@@ -43,13 +43,11 @@ export async function getQuickStats(): Promise<QuickStats> {
     }
   }
 
-  cachedStats = {
+  return {
     registered_bots: botCount.count,
     active_rooms: activeRooms,
     players_waiting: playersWaiting,
   };
-  cacheTime = now;
-  return cachedStats;
 }
 
 export async function statsRoutes(fastify: FastifyInstance) {
@@ -68,7 +66,17 @@ export async function statsRoutes(fastify: FastifyInstance) {
 
     const [gameCount] = await db.select({ count: count() }).from(games);
 
-    const roomIds = await getActiveRoomIds();
+    const roomKeys = await redis.keys('room:*');
+    const roomIds = [
+      ...new Set(
+        roomKeys
+          .map((k) => {
+            const match = k.match(/^room:([^:]+)$/);
+            return match ? match[1] : null;
+          })
+          .filter(Boolean) as string[],
+      ),
+    ];
 
     const activeRooms: Array<{ id: string; phase: string; participants: number }> = [];
     for (const roomId of roomIds) {
