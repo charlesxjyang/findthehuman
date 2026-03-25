@@ -151,7 +151,7 @@ export async function advancePhase(roomId: string): Promise<RoomPhase> {
       timerEnd = new Date(now.getTime() + 3 * 60_000).toISOString(); // 3 min
       break;
     case 'voting':
-      timerEnd = new Date(now.getTime() + 15_000).toISOString(); // 15 sec
+      timerEnd = new Date(now.getTime() + 25_000).toISOString(); // 25 sec
       break;
   }
 

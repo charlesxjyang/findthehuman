@@ -75,7 +75,7 @@ async function handlePhaseTransition(roomId: string, expectedPhase: string, io: 
       schedulePhaseTransition(roomId, 3 * 60_000, 'discussion', io); // 3 min
       break;
     case 'voting':
-      schedulePhaseTransition(roomId, 15_000, 'voting', io); // 15 sec
+      schedulePhaseTransition(roomId, 25_000, 'voting', io); // 25 sec
       break;
     case 'reveal':
       await processGameResults(roomId, io);

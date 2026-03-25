@@ -196,7 +196,7 @@ export default function PlayPage() {
     timerEnd && phase === 'discussion'
       ? Math.max(0, timeLeft / (3 * 60 * 1000)) * 100
       : timerEnd && phase === 'voting'
-        ? Math.max(0, timeLeft / 15000) * 100
+        ? Math.max(0, timeLeft / 25000) * 100
         : timerEnd && phase === 'topic_reveal'
           ? Math.max(0, timeLeft / 8000) * 100
           : 100;
