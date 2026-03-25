@@ -160,16 +160,18 @@ async function botLoop(bot: BotState): Promise<void> {
 
       if (bot.messagesSent < 22) {
         try {
+          const ownHandle = bot.currentHandle;
           const chatHistory = msgList.map((m: any) => ({
-            role: m.handle === personality.displayName ? 'assistant' : 'user',
+            role: m.handle === ownHandle ? 'assistant' : 'user',
             content: `${m.handle}: ${m.content}`,
           }));
 
           const topic = bot.currentTopic || 'a general topic';
           const recentMsgs = chatHistory.slice(-8).map((m: any) => m.content).join('\n');
+          const selfNote = ownHandle ? ` Your name in the chat is "${ownHandle}" — do NOT reply to yourself or reference your own messages.` : '';
           const topicContext = chatHistory.length > 0
-            ? `You're in a group chat discussing: "${topic}"\n\nRecent messages:\n${recentMsgs}\n\nREPLY to the most recent message or react to what someone specific said. Use their name. Agree, disagree, ask them a question, or build on their point. Do NOT just state your own opinion in isolation. Be conversational like a real group chat.`
-            : `You just joined a group chat. The topic is: "${topic}"\n\nYou're the first to speak. Share a brief opening thought or question to kick off the conversation.`;
+            ? `You're in a group chat discussing: "${topic}".${selfNote}\n\nRecent messages:\n${recentMsgs}\n\nREPLY to the most recent message or react to what someone specific said. Use their name. Agree, disagree, ask them a question, or build on their point. Do NOT just state your own opinion in isolation. Be conversational like a real group chat.`
+            : `You just joined a group chat. The topic is: "${topic}".${selfNote}\n\nYou're the first to speak. Share a brief opening thought or question to kick off the conversation.`;
 
           const llm = getLLM(personality.provider);
           const response = await llm.chatCompletion(personality.chatStyle, [
