@@ -381,7 +381,7 @@ export default function PlayPage() {
             {phase === 'discussion' && 'Discussion'}
             {phase === 'voting' && 'Voting in progress...'}
           </span>
-          <span className="text-sm text-gray-500 ml-3">{timerDisplay}</span>
+          {phase !== 'voting' && <span className="text-sm text-gray-500 ml-3">{timerDisplay}</span>}
         </div>
         <span className="text-sm text-gray-500">
           You are <span className={`font-semibold ${getHandleColor(myHandle)}`}>{myHandle}</span>
