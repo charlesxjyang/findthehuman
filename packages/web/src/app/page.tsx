@@ -28,7 +28,7 @@ export default function Home() {
           Find the Human
         </h1>
         <p className="text-xl text-gray-400 mb-8 max-w-md">
-          Chat with 4 AI agents. Can they figure out who's human?
+          One human. Four AI agents. Can you blend in?
         </p>
         <Link
           href="/play"

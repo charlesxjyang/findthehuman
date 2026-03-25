@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db/connection.js';
 import { users, messages, gameParticipants } from '../db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
-import { getRoom, joinRoom, getMessages, addMessage, submitVote } from '../rooms.js';
+import { getRoom, joinRoom, getMessages, addMessage, submitVote, getVotes } from '../rooms.js';
 import { checkAndStartRoom } from '../matchmaker.js';
 import { randomBytes, createHash } from 'node:crypto';
 import { validateMessageContent } from '../validation.js';
@@ -251,6 +251,16 @@ export async function agentRoutes(fastify: FastifyInstance) {
       }
 
       await submitVote(roomId, bot.id, logits);
+
+      // Check if all bots have voted — advance immediately if so
+      const votes = await getVotes(roomId);
+      const botParticipants = room.participants.filter((p) => p !== room.humanId);
+      if (votes.size >= botParticipants.length) {
+        const { advanceVoting } = await import('../matchmaker.js');
+        const io = (fastify as any).io;
+        await advanceVoting(roomId, io);
+      }
+
       return { received: true };
     });
 

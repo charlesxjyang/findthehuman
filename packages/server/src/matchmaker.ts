@@ -75,7 +75,7 @@ async function handlePhaseTransition(roomId: string, expectedPhase: string, io: 
       schedulePhaseTransition(roomId, 3 * 60_000, 'discussion', io); // 3 min
       break;
     case 'voting':
-      schedulePhaseTransition(roomId, 25_000, 'voting', io); // 25 sec
+      schedulePhaseTransition(roomId, 60_000, 'voting', io); // 60s fallback timeout
       break;
     case 'reveal':
       await processGameResults(roomId, io);
@@ -84,6 +84,16 @@ async function handlePhaseTransition(roomId: string, expectedPhase: string, io: 
     case 'complete':
       break;
   }
+}
+
+/**
+ * Called when all bots have voted — skip the timer and advance immediately.
+ */
+export async function advanceVoting(roomId: string, io: Server): Promise<void> {
+  const room = await getRoom(roomId);
+  if (!room || room.phase !== 'voting') return;
+  clearRoomTimer(`${roomId}:voting`);
+  await handlePhaseTransition(roomId, 'voting', io);
 }
 
 // Store io reference for use by matchHuman/checkAndStartRoom

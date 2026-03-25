@@ -195,8 +195,8 @@ export default function PlayPage() {
   const timerPercent =
     timerEnd && phase === 'discussion'
       ? Math.max(0, timeLeft / (3 * 60 * 1000)) * 100
-      : timerEnd && phase === 'voting'
-        ? Math.max(0, timeLeft / 25000) * 100
+      : phase === 'voting'
+        ? 100 // no countdown — waiting for all bots to vote
         : timerEnd && phase === 'topic_reveal'
           ? Math.max(0, timeLeft / 8000) * 100
           : 100;
