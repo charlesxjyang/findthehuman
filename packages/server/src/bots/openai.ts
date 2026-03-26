@@ -66,7 +66,7 @@ Participants to evaluate: ${otherHandles.join(', ')}
 
 First, briefly explain your reasoning for each participant (2-3 sentences each). Then on a final line, output ONLY a JSON array of numbers, one per participant in the order listed above. Higher = more likely human. Example: [1.2, -0.5, 3.1, 0.0]`;
 
-      const text = await openaiCall(model, systemPrompt, prompt, 500, 0.3);
+      const text = await openaiCall(model, systemPrompt, prompt, 500, 1);
 
       const match = text.match(/\[[\d\s,.\-]+\]/);
       if (match) {
