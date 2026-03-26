@@ -31,7 +31,9 @@ async function groqCall(
   }
 
   const data = (await res.json()) as any;
-  return data.choices?.[0]?.message?.content?.trim() || '';
+  const raw = data.choices?.[0]?.message?.content?.trim() || '';
+  // Strip <think> tags (DeepSeek R1 includes reasoning in output)
+  return raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 }
 
 function makeProvider(model: string) {
