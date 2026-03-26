@@ -89,6 +89,7 @@ First, briefly explain your reasoning for each participant (2-3 sentences each).
 
 export const llama = makeProvider('llama-3.3-70b-versatile');
 export const qwen = makeProvider('qwen/qwen3-32b');
+export const compound = makeProvider('compound-beta');
 
 // Default exports for backward compat
 export const chatCompletion = llama.chatCompletion;
