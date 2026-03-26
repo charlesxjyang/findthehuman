@@ -41,7 +41,7 @@ export function makeOpenAIProvider(model: string) {
       messages: Array<{ role: string; content: string }>,
     ): Promise<string> {
       const userMessage = messages.map((m) => m.content).join('\n');
-      return openaiCall(model, systemPrompt, userMessage, 250, 0.9);
+      return openaiCall(model, systemPrompt, userMessage, 250, 1);
     },
 
     async generateLogits(
