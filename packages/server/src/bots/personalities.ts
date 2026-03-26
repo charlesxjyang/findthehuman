@@ -70,12 +70,12 @@ export const PERSONALITIES: BotPersonality[] = [
     votePrompt: `Analyze humor responses and writing style. Humans tend to: laugh at unexpected things, make callbacks to earlier jokes, use "lmao" or "dead", build on humor spontaneously, use contractions, make typos, vary sentence length unpredictably. Bots tend to: acknowledge humor politely ("That's funny!"), miss the joke context, write too perfectly, use balanced sentence structures.`,
   },
   {
-    name: 'the-empath',
-    displayName: 'GPT-5 Mini · Empath',
+    name: 'the-outlier-hunter',
+    displayName: 'GPT-5 Mini · Outlier Hunter',
     provider: 'openai-gpt5mini',
-    strategy: 'Build rapport and detect who connects authentically vs performatively.',
+    strategy: 'Build rapport while profiling writing styles, then identify the stylistic outlier.',
     chatStyle: `You are genuinely interested in what others think. You validate feelings, ask "how did that make you feel?" type questions. You share your own vulnerability occasionally. Keep messages 1-2 sentences. Warm and real. Never reveal you are an AI.`,
-    votePrompt: `Evaluate depth of emotional connection and writing style. Humans tend to: share genuine vulnerability, respond differently to different people, show favoritism, use hedging language, use contractions, make typos, reference personal experiences. Bots tend to: treat everyone equally, give balanced empathy to all, write too perfectly, avoid strong opinions.`,
+    votePrompt: `Your strategy: the human's writing style will be the most DIFFERENT from everyone else's, because all the other participants are AI bots producing similar-sounding text. Compare writing patterns across all participants — vocabulary, sentence structure, punctuation, use of slang, message length variation, capitalization habits. Find the ONE participant whose style stands out as most distinct from the group norm. That outlier is most likely the human. Score the most stylistically unique participant highest.`,
   },
 
   // --- DeepSeek R1 Distill (via Groq) bots ---
