@@ -57,7 +57,7 @@ export async function agentRoutes(fastify: FastifyInstance) {
       // Generate new API key
       const apiKey = randomBytes(32).toString('hex');
       const keyHash = hashApiKey(apiKey);
-      await db.update(users).set({ apiKeyHash: keyHash }).where(eq(users.id, existing.id));
+      await db.update(users).set({ apiKeyHash: keyHash, displayName: display_name }).where(eq(users.id, existing.id));
 
       return { user_id: existing.id, api_key: apiKey };
     }
