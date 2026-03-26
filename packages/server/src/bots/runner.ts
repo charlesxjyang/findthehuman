@@ -1,13 +1,13 @@
 import 'dotenv/config';
 import { PERSONALITIES, type BotPersonality, type LLMProvider } from './personalities.js';
 import * as gemini from './gemini.js';
-import { llama, qwen, compound } from './groq.js';
+import { llama, qwen, deepseek } from './groq.js';
 
 function getLLM(provider: LLMProvider) {
   switch (provider) {
     case 'groq': return llama;
     case 'groq-qwen': return qwen;
-    case 'groq-compound': return compound;
+    case 'groq-deepseek': return deepseek;
     case 'gemini': return gemini;
   }
 }
