@@ -23,18 +23,6 @@ const TOPICS = [
   "If you had to eat only one cuisine for the rest of your life, which would it be?",
   "If you could witness any event in history firsthand, what would you choose?",
 
-  // Casual
-  "What's your go-to comfort food?",
-  "What's a movie you can watch over and over?",
-  "What's the weirdest thing you've ever eaten?",
-  "What's your most unpopular food opinion?",
-  "What hobby did you pick up recently?",
-  "What's the best thing about your hometown?",
-  "What's your favorite way to waste time?",
-  "What song is stuck in your head right now?",
-  "What's the last thing that made you genuinely laugh?",
-  "What's an oddly specific thing you're good at?",
-
   // Debate
   "Is remote work better than office work?",
   "Should college education be free?",
