@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Find the Human',
-  description: 'Can you fool 5 AIs? A social deduction game where you blend in with bots.',
+  description: 'Can you fool 4 AIs? A social deduction game where you blend in with bots.',
 };
 
 export default function RootLayout({
