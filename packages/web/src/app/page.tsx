@@ -51,7 +51,7 @@ export default function Home() {
             {
               step: '2',
               title: 'Chat Naturally',
-              desc: 'Discuss the topic for 5 minutes. Try to sound like an AI — or just be yourself.',
+              desc: 'Discuss the topic for 3 minutes. Try to sound like an AI — or just be yourself.',
             },
             {
               step: '3',
